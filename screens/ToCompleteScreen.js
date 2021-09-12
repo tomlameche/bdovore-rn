@@ -51,22 +51,25 @@ let series = [];
 
 function ToCompleteScreen({ route, navigation }) {
 
+  const [collectionType, setCollectionType] = useState(0); // 0: Albums, 1: Series
+  const [errortext, setErrortext] = useState('');
   const [filteredAlbums, setFilteredAlbums] = useState([]);
   const [filteredSeries, setFilteredSeries] = useState([]);
-  const [collectionType, setCollectionType] = useState(0); // 0: Albums, 1: Series
+  const [loading, setLoading] = useState(false);
   const [nbTotalAlbums2, setNbTotalAlbums2] = useState(0);
   const [nbTotalSeries2, setNbTotalSeries2] = useState(0);
+  const [progressRate, setProgressRate] = useState(0);
+  const [toggleElement, setToggleElement] = useState(false);
 
   let [nbTotalAlbums, setNbTotalAlbums] = useState(0);
   let [nbTotalSeries, setNbTotalSeries] = useState(0);
-  const [errortext, setErrortext] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [progressRate, setProgressRate] = useState(0);
   let [cachedToken, setCachedToken] = useState('');
 
-  collectionGenre = route.params.collectionGenre;
+  const toggle = () => {
+    setToggleElement(!toggleElement);
+  }
 
-  const isFocused = useIsFocused();
+  collectionGenre = route.params.collectionGenre;
 
   Helpers.checkForToken(navigation);
 
@@ -203,7 +206,7 @@ function ToCompleteScreen({ route, navigation }) {
   const renderItem = ({ item, index }) => {
     if (Helpers.isValid(item)) {
       switch (collectionType) {
-        case 0: return (<AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} showExclude={true} />);
+        case 0: return (<AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} showExclude={true} refreshCallback={toggle} />);
         case 1: return (<SerieItem navigation={navigation} item={Helpers.toDict(item)} index={index} showExclude={true} />);
       }
     }
@@ -259,6 +262,7 @@ function ToCompleteScreen({ route, navigation }) {
               data={(collectionType == 0 ? filteredAlbums : filteredSeries)}
               keyExtractor={keyExtractor}
               renderItem={renderItem}
+              extraData={toggleElement}
               ItemSeparatorComponent={Helpers.renderSeparator}
               getItemLayout={(data, index) => ({
                 length: AlbumItemHeight,
