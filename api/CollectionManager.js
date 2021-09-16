@@ -26,8 +26,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import * as APIManager from '../api/APIManager';
 import * as Helpers from '../api/Helpers';
 
@@ -192,10 +190,14 @@ class CCollectionManager {
   resetDatabase() {
     console.debug('/!\\ Database reset /!\\');
     if (global.verbose) {
-      Helpers.showToast(true, 'Réinitilisation de la base de données');
+      Helpers.showToast(false, 'Réinitilisation de la base de données');
     }
     Realm.deleteFile({}); // TODO: Remove - Delete the database (schema+data)!
     this.initializeDatabase();
+  }
+
+  saveTimestamp() {
+    Helpers.saveTimestamp();
   }
 
   initializeDatabase(reentry = false) {
@@ -208,7 +210,7 @@ class CCollectionManager {
           { name: 'Wishes', primaryKey: '_id', properties: AlbumSchema }]
       }).then(realm => {
         global.db = realm;
-        console.debug('db initialized');
+        console.debug('Database initialized');
       }).catch(error => {
         console.debug(error);
         if (!reentry) {
@@ -261,6 +263,23 @@ class CCollectionManager {
     return this.numberOfAlbums(origine) == 0;
   }
 
+  // Fetch all the collection in a row
+  fetchCollection(navigation, callback) {
+    this.fetchSeries(navigation, (result) => {
+      if (callback) callback(result, 0);
+      if (result.done) {
+        this.fetchAlbums(navigation, (result) => {
+          if (callback) callback(result, 1);
+          if (result.done) {
+            this.fetchWishlist(navigation, (result) => {
+              if (callback) callback(result, 2);
+            });
+          }
+        });
+      }
+    });
+  }
+
   // Fetch all the series within the collection
   fetchSeries(navigation, callback) {
 
@@ -288,6 +307,10 @@ class CCollectionManager {
           }
         });
       });
+
+      if (!result.error && result.done) {
+        this.saveTimestamp();
+      }
     }
 
     callback(result);
@@ -318,6 +341,10 @@ class CCollectionManager {
           }
         });
       });
+
+      if (!result.error && result.done) {
+        this.saveTimestamp();
+      }
     }
 
     callback(result);
@@ -346,6 +373,10 @@ class CCollectionManager {
         } catch (error) {
         }
       });
+
+      if (!result.error && result.done) {
+        this.saveTimestamp();
+      }
     });
 
     callback(result);
@@ -393,7 +424,7 @@ class CCollectionManager {
           console.debug('série ' + serie.ID_SERIE + ' (' + serieAlbums.length + ' albums) added to collection');
         }
       } catch (error) {
-        result.error = "Erreur inattendue lors de l'ajout de la série";
+        result.error = error;
       }
 
       if (callback) {
@@ -401,9 +432,10 @@ class CCollectionManager {
       }
 
       if (result.error) {
-        Helpers.showToast(result.error, result.error ?
-          'Erreur de connexion au serveur.' :
-          'Série ajoutée à la collection.');
+        console.debug(result.error);
+        Helpers.showToast(true, "Erreur inattendue lors de l'ajout de la série.", result.error);
+      } else if (global.verbose) {
+        Helpers.showToast(false, 'Série ajoutée à la collection.');
       }
     })
   }
@@ -490,12 +522,8 @@ class CCollectionManager {
                     console.debug('serie ' + album.ID_SERIE + ' added to collection');
                   });
                 } catch (error) {
-                  console.log(error);
+                  result.error = error;
                 }
-              } else {
-                Helpers.showToast(result.error, result.error ?
-                  'Erreur de connexion au serveur.' :
-                  'Album ajouté à la collection.');
               }
             });
           } else {
@@ -503,7 +531,7 @@ class CCollectionManager {
           }
         }
       } catch (error) {
-        result.error = "Erreur inattendue lors de l'ajout de l'album";
+        result.error = error;
       }
 
       if (callback) {
@@ -511,9 +539,10 @@ class CCollectionManager {
       }
 
       if (result.error) {
-        Helpers.showToast(result.error, result.error ?
-          'Erreur de connexion au serveur.' :
-          'Album ajouté à la collection.');
+        console.debug(result.error);
+        Helpers.showToast(true, "Erreur inattendue lors de l'ajout.", result.error);
+      } else if (global.verbose) {
+        Helpers.showToast(false, 'Album ajouté à la collection.')
       }
     }, {
       'id_edition': album.ID_EDITION,
@@ -558,7 +587,7 @@ class CCollectionManager {
           global.collectionManquantsUpdated = false;
         }
       } catch (error) {
-        result.error = "Erreur inattendue lors de la suppression de l'album";
+        result.error = error;
       }
 
       if (callback) {
@@ -566,9 +595,10 @@ class CCollectionManager {
       }
 
       if (result.error) {
-        Helpers.showToast(result.error, result.error ?
-          'Erreur de connexion au serveur.' :
-          'Album supprimé de la collection.');
+        console.debug(result.error);
+        Helpers.showToast(true, 'Erreur inattendue lors de la suppression.', result.error);
+      } else if (global.verbose) {
+        Helpers.showToast(false, 'Album supprimé de la collection.');
       }
     });
   }
@@ -589,9 +619,12 @@ class CCollectionManager {
           });
 
           console.debug('album ' + album.ID_TOME + ' added to the wishlist');
+          if (global.verbose) {
+            Helpers.showToast(false, 'Album ajouté à la wishlist.');
+          }
         }
       } catch (error) {
-        result.error = "Erreur inattendue lors de l'ajout de l'album";
+        result.error = error;
       }
 
       if (callback) {
@@ -599,9 +632,10 @@ class CCollectionManager {
       }
 
       if (result.error) {
-        Helpers.showToast(result.error, result.error ?
-          'Erreur de connexion au serveur.' :
-          'Album ajouté à la wishlist.');
+        console.debug(result.error);
+        Helpers.showToast(true, "Erreur inattendue lors de l'ajout.", result.error);
+      } else if (global.verbose) {
+        Helpers.showToast(false, 'Album ajouté à la wishlist.');
       }
     }, {
       'id_edition': album.ID_EDITION,
@@ -627,7 +661,7 @@ class CCollectionManager {
           console.debug('album ' + album.ID_TOME + ' removed from the wishlist: ' + this.isAlbumInWishlist(album));
         }
       } catch (error) {
-        result.error = "Erreur inattendue lors de la suppression de l'album";
+        result.error = error;
       }
 
       if (callback) {
@@ -635,9 +669,10 @@ class CCollectionManager {
       }
 
       if (result.error) {
-        Helpers.showToast(result.error, result.error ?
-          'Erreur de connexion au serveur' :
-          'Album supprimé de la wishlist.');
+        console.debug(result.error);
+        Helpers.showToast(true, 'Erreur inattendue lors de la suppression', result.error);
+      } else if (global.verbose) {
+        Helpers.showToast(false, 'Album supprimé de la wishlist.');
       }
     });
   }
@@ -716,10 +751,10 @@ class CCollectionManager {
         callback(result);
       }
       if (result.error) {
-        Helpers.showToast(result.error,
-          result.error ?
-            'Erreur de connexion au serveur' :
-            'Paramètres de l\'album correctement modifiés.');
+        console.debug(result.error);
+        Helpers.showToast(true, 'Erreur inattendue lors de la modification.', result.error);
+      } else if (global.verbose) {
+        Helpers.showToast(false, "Paramètres de l'album correctement modifiés.");
       }
     }, {
       'id_edition': album.ID_EDITION,
@@ -733,6 +768,11 @@ class CCollectionManager {
 
   isAlbumInCollection(album) {
     return this.getAlbumInCollection(album) != null;
+  }
+
+  isAlbumTomeInCollection(album) {
+    const albums = this.getAlbums().filtered('ID_SERIE == $0 && ID_TOME == $1', parseInt(album.ID_SERIE), parseInt(album.ID_TOME));
+    return albums.length > 0;
   }
 
   isAlbumInWishlist(album) {
@@ -758,6 +798,17 @@ class CCollectionManager {
   getNbOfUserAlbumsInSerie(id_serie) {
     const albums = this.getAlbums().filtered('ID_SERIE == $0', parseInt(id_serie));
     return albums ? albums.length : 0;
+  }
+
+  getNbOfTomesInCollection = (id_serie) => {
+    const albums = this.getAlbums().filtered('ID_SERIE == $0', parseInt(id_serie));
+    let albsTomes = {};
+    albums.forEach(album => {
+      if (album.NUM_TOME > 0) {
+        albsTomes[album.ID_TOME] = 1;
+      }
+    });
+    return Object.keys(albsTomes).length;
   }
 
   getNbOfUserAlbumsByAuthor(id_author) {

@@ -28,9 +28,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Progress from 'react-native-progress';
-import { useIsFocused } from '@react-navigation/native';
 import { ButtonGroup } from 'react-native-elements';
 
 import { AlbumItem } from '../components/AlbumItem';
@@ -59,19 +57,34 @@ function ToCompleteScreen({ route, navigation }) {
   const [nbTotalAlbums2, setNbTotalAlbums2] = useState(0);
   const [nbTotalSeries2, setNbTotalSeries2] = useState(0);
   const [progressRate, setProgressRate] = useState(0);
-  const [toggleElement, setToggleElement] = useState(false);
 
   let [nbTotalAlbums, setNbTotalAlbums] = useState(0);
   let [nbTotalSeries, setNbTotalSeries] = useState(0);
   let [cachedToken, setCachedToken] = useState('');
 
-  const toggle = () => {
-    setToggleElement(!toggleElement);
-  }
-
   collectionGenre = route.params.collectionGenre;
 
-  Helpers.checkForToken(navigation);
+  const refreshDataIfNeeded = (force = false) => {
+    if (CollectionManager.isCollectionEmpty()) {
+      setNbTotalAlbums2(0);
+      setNbTotalSeries2(0);
+      albums = [];
+      series = [];
+    }
+
+    console.log('refreshing ????? local ' + cachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
+    if ((global.autoSync || force) && cachedToken != 'fetching' && !global.forceOffline && (cachedToken != global.token || !global.collectionManquantsUpdated)) {
+      const savedCachedToken = cachedToken;
+      cachedToken = 'fetching';
+      APIManager.onConnected(navigation, () => {
+        console.log('refreshing from local ' + savedCachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
+        fetchData();
+      }, () => { cachedToken = savedCachedToken; });
+    }
+
+    applyAlbumsFilters();
+    applySeriesFilters();
+  }
 
   useEffect(() => {
     navigation.setOptions({
@@ -81,29 +94,6 @@ function ToCompleteScreen({ route, navigation }) {
     applyAlbumsFilters();
     applySeriesFilters();
   }, [collectionGenre]);
-
-  const refreshDataIfNeeded = () => {
-    if (CollectionManager.isCollectionEmpty()) {
-      setNbTotalAlbums2(0);
-      setNbTotalSeries2(0);
-      albums = [];
-      series = [];
-    }
-
-    AsyncStorage.getItem('token').then((token) => {
-      if (token !== cachedToken) {
-        console.debug("refresh tocomplete because token changed from " + cachedToken + ' to ' + token);
-        setCachedToken(token);
-        cachedToken = token;
-        fetchData();
-      } else if (!global.collectionManquantsUpdated) {
-        fetchData();
-      }
-    }).catch(() => { });
-
-    applyAlbumsFilters();
-    applySeriesFilters();
-  }
 
   const applyAlbumsFilters = () => {
     const genre = CollectionManager.CollectionGenres[collectionGenre][0];
@@ -124,11 +114,15 @@ function ToCompleteScreen({ route, navigation }) {
       refreshDataIfNeeded();
     });
     return willFocusSubscription;
-  }, [cachedToken]);
+  }, []);
 
   const makeProgress = (result) => {
     loadingSteps -= (result.done ? 1 : 0);
     setLoading(loadingSteps > 0);
+
+    if (loadingSteps == 0) {
+      cachedToken = global.token;
+    }
 
     if (parseFloat(nbTotalAlbums) > 0 && parseFloat(nbTotalSeries) > 0) {
       const nbTotalItems = parseFloat(nbTotalAlbums) + parseFloat(nbTotalSeries);
@@ -167,7 +161,7 @@ function ToCompleteScreen({ route, navigation }) {
     console.debug(result.items.length + ' albums fetched so far');
     setNbTotalAlbums2(result.totalItems);
     nbTotalAlbums = result.totalItems;
-    albums = result.items;
+    albums.push(...result.items);
     setErrortext(result.error);
     loadedAlbums = result.items.length;
 
@@ -190,7 +184,7 @@ function ToCompleteScreen({ route, navigation }) {
     console.debug(result.items.length + ' series to complete fetched')
     setNbTotalSeries2(result.totalItems);
     nbTotalSeries = result.totalItems;
-    series = result.items;
+    series.push(...result.items);
     setErrortext(result.error);
     loadedSeries = result.items.length;
 
@@ -206,7 +200,7 @@ function ToCompleteScreen({ route, navigation }) {
   const renderItem = ({ item, index }) => {
     if (Helpers.isValid(item)) {
       switch (collectionType) {
-        case 0: return (<AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} showExclude={true} refreshCallback={toggle} />);
+        case 0: return (<AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} showExclude={true} />);
         case 1: return (<SerieItem navigation={navigation} item={Helpers.toDict(item)} index={index} showExclude={true} />);
       }
     }
@@ -235,6 +229,8 @@ function ToCompleteScreen({ route, navigation }) {
           selectedButtonStyle={CommonStyles.buttonGroupSelectedButtonStyle}
           innerBorderStyle={CommonStyles.buttonGroupInnerBorderStyle}
         />
+        {(!global.autoSync && (!global.collectionManquantsUpdated || albums.length == 0)) ?
+          <TouchableOpacity onPress={() => refreshDataIfNeeded(true)}><Icon name='refresh' size={25} style={{ marginTop: 6, marginRight: 10 }} /></TouchableOpacity> : null}
       </View>
       {global.isConnected ?
         <View style={{ marginHorizontal: 1 }}>
@@ -262,7 +258,6 @@ function ToCompleteScreen({ route, navigation }) {
               data={(collectionType == 0 ? filteredAlbums : filteredSeries)}
               keyExtractor={keyExtractor}
               renderItem={renderItem}
-              extraData={toggleElement}
               ItemSeparatorComponent={Helpers.renderSeparator}
               getItemLayout={(data, index) => ({
                 length: AlbumItemHeight,

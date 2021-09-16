@@ -36,6 +36,7 @@ class CSettingsManager {
 
   constructor() {
     this.initialize();
+    console.debug("Settings Manager initialized");
   }
 
   initialize() {
@@ -45,67 +46,84 @@ class CSettingsManager {
     // Subscribe to network change events
     NetInfo.addEventListener(this.connectionCallback);
 
-    global.timestamp = '';
-    AsyncStorage.getItem('timestamp').then((value) => {
-      global.timestamp(value);
+    global.token = undefined;
+
+    global.serverTimestamp = null;
+    global.localTimestamp = null;
+    AsyncStorage.getItem('localTimestamp').then(value => {
+      if (value) global.localTimestamp = value;
     }).catch(() => { });
 
+    global.autoSync = true;
+    AsyncStorage.getItem('autoSync').then(value => {
+      if (value) global.autoSync = (value != '0');
+    }).catch(() => { });
 
     global.showExcludedAlbums = true;
-    AsyncStorage.getItem('showExcludedAlbums').then((value) => {
-      global.showExcludedAlbums(value != '0');
+    AsyncStorage.getItem('showExcludedAlbums').then(value => {
+      if (value) global.showExcludedAlbums = (value != '0');
     }).catch(() => { });
 
     global.imageOnWifi = false;
-    AsyncStorage.getItem('imageOnWifi').then((value) => {
-      global.imageOnWifi(value != '0');
+    AsyncStorage.getItem('imageOnWifi').then(value => {
+      if (value) global.imageOnWifi = (value != '0');
     }).catch(() => { });
 
     //global.hideSponsoredLinks = true;
     /*if (Platform.OS != 'ios')*/ {
       global.hideSponsoredLinks = false;
-      AsyncStorage.getItem('hideSponsoredLinks').then((value) => {
-        global.hideSponsoredLinks(value != '0');
+      AsyncStorage.getItem('hideSponsoredLinks').then(value => {
+        if (value) global.hideSponsoredLinks = (value != '0');
       }).catch(() => { });
     }
 
     global.showBDovoreIds = false;
-    AsyncStorage.getItem('showBDovoreIds').then((value) => {
-      global.showBDovoreIds(value != '0');
+    AsyncStorage.getItem('showBDovoreIds').then(value => {
+      if (value) global.showBDovoreIds = (value != '0');
     }).catch(() => { });
 
     global.verbose = false;
-    AsyncStorage.getItem('verbose').then((value) => {
-      global.verbose(value != '0');
+    AsyncStorage.getItem('verbose').then(value => {
+      if (value) global.verbose = (value != '0');
     }).catch(() => { });
 
     global.confirmDeletion = false;
-    AsyncStorage.getItem('confirmDeletion').then((value) => {
-      global.confirmDeletion(value != '0');
+    AsyncStorage.getItem('confirmDeletion').then(value => {
+      if (value) global.confirmDeletion = (value != '0');
     }).catch(() => { });
 
-    global.showConnectionMessages = true;
-    AsyncStorage.getItem('showConnectionMessages').then((value) => {
-      global.showConnectionMessages(value != '0');
+    global.showConnectionMessages = false;
+    AsyncStorage.getItem('showConnectionMessages').then(value => {
+      if (value) global.showConnectionMessages = (value != '0');
     }).catch(() => { });
   }
 
   connectionCallback(state) {
-    console.log(state);
-    console.debug('Connection type ' + state.type + (state.isConnected ? ' enabled' : ' disabled'));
+    //console.log(state);
+    //console.debug('Connection type ' + state.type + (state.isConnected ? ' enabled' : ' disabled'));
     global.connectionType = state.type;
-    console.debug('Global connection state: ' + global.isConnected);
     if (!global.forceOffline && global.isConnected != state.isConnected) {
       global.isConnected = state.isConnected;
+      console.debug('Global connection state: ' + global.isConnected);
       if (showConnectionMessages) {
         Helpers.showToast(false, 'Connexion ' + state.type + (state.isConnected ? ' activée' : ' désactivée'));
       }
     }
   }
 
+  getConnectionStatus(callback = () => {}) {
+    NetInfo.fetch().then(state => {
+      this.connectionCallback(state);
+      if (callback) {
+        callback();
+      }
+    }).catch(error => { console.debug(error) });
+  }
+
   isWifiConnected() {
     return !global.forceOffline && global.connectionType == 'wifi' && global.isConnected;
   }
+
 };
 
 const SettingsManager = new CSettingsManager();

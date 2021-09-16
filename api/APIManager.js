@@ -29,7 +29,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-import { showToast } from '../api/Helpers';
+import * as Helpers from '../api/Helpers';
+import SettingsManager from './SettingsManager';
 
 const bdovoreUserAgent = 'bdovore ' + Platform.OS + ' v0.1';
 
@@ -72,22 +73,34 @@ const fetchZIP = async (url) => {
   });
 };
 
-export async function checkForToken(navigation = null) {
-  // const navigation = useNavigation();
-  // Move to login page if no token available
-  const token = await AsyncStorage.getItem('token');
-  if (token === null && navigation) {
-    navigation.navigate('Login');
-  } else if (token === 'expired' && navigation) {
-    reloginBDovore(navigation);
-  } else {
-    return token;
-  }
-  return '';
+export function isValidToken() {
+  return global.token && global.token.match(/([0-9]+)-([0-9a-f]+)/);
 }
 
-export function reloginBDovore(navigation, callback = null) {
+export function checkForToken(navigation = null, callback = null) {
+  // Move to login page if no token available
+  if (isValidToken()) {
+    return callback ? callback() : global.token;
+  }
+  if (global.forceOffline) {
+    return callback ? callback() : 'offline-';
+  }
+  if (!global.token && !navigation) {
+    console.log('undefined token -> relogin');
+    return reloginBDovore(navigation, callback);
+  }
+  if (!global.token && navigation) {
+    return navigation.navigate('Login');
+  }
+  if (callback) {
+    callback();
+  }
+  return global.token;
+}
 
+export async function reloginBDovore(navigation, callback = null) {
+
+  console.log("relogin!");
   if (global.isConnected) {
     AsyncStorage.multiGet(['login', 'passwd'])
       .then((values) => {
@@ -98,31 +111,24 @@ export function reloginBDovore(navigation, callback = null) {
             if (navigation) {
               navigation.navigate('Login');
             }
-          } else {
-            AsyncStorage.setItem('token', response.token);
-            console.debug("New token " + response.token + " fetched!");
-
-            AsyncStorage.multiSet([
-              ['token', response.token],
-              ['timestamp', response.timestamp]], () => { }).then(() => {
-                global.timestamp = response.timestamp;
-                if (callback) {
-                  callback();
-                };
-              }).catch((error) => console.debug(error));
+          } else if (callback) {
+            callback();
           }
         });
       })
       .catch((error) => {
+        console.log(error);
         if (navigation) {
           navigation.navigate('Login');
         }
       });
+  } else {
+    console.log('Not connected.');
   }
 }
 
 export function loginBDovore(pseudo, passwd, callback) {
-  const formatResult = (connected, token, timestamp, error = '') => {
+  const formatResult = (connected, token, error = '', timestamp = '') => {
     return { connected, token, error, timestamp };
   }
 
@@ -144,18 +150,22 @@ export function loginBDovore(pseudo, passwd, callback) {
     },
     body: encodeURI('user_login=' + pseudo + '&user_password=' + passwd)
   })
-    .then((response) => response.json())
-    .then((responseJson) => {
-      if (responseJson.Error === '') {
-        console.debug("New token: " + responseJson.Token);
-        console.log(responseJson);
-        callback(formatResult(true, responseJson.Token, responseJson.Timestamp ?? null));
+    .then(resp => resp.json())
+    .then(response => {
+      if (response.Error === '') {
+        console.debug("New token: " + response.Token);
+        console.debug("  server timestamp: " + response.Timestamp);
+        global.token = response.Token;
+        global.serverTimestamp = response.Timestamp;
+        //console.log(responseJson);
+        callback(formatResult(true, response.Token, '', response.Timestamp ?? null));
       } else {
-        callback(formatResult(false, responseJson.Token, responseJson.Error));
+        callback(formatResult(false, response.Token, response.Error));
       }
     })
     .catch((error) => {
-      showToast(true,
+      console.debug(error);
+      Helpers.showToast(true,
         'Erreur de connexion au serveur.',
         'Vérifiez la connexion internet.',
         1500);
@@ -163,82 +173,86 @@ export function loginBDovore(pseudo, passwd, callback) {
     });
 }
 
+export async function onConnected(navigation, successCb = () => { }, failCb = () => { }) {
+  SettingsManager.getConnectionStatus(() => {
+    if (global.isConnected) {
+      return checkForToken(navigation, successCb);
+    }
+    return failCb();
+  });
+}
+
 export async function fetchJSON(request, context, callback, params = {},
   datamode = false, multipage = false, multipageTotalField = 'nbTotal', pageLength = 1000, retry = 5) {
 
-  const formatResult = (items = [], error = '', done = true, totalItems = null) => {
-    const nbItems = Object.keys(items).length;
-    return {
-      nbItems,
-      items,
-      error,
-      done,
-      totalItems: (totalItems ? totalItems : nbItems)
-    };
-  }
+  onConnected(context ? context.navigation : null, () => {
 
-  let userMode = false;
-  let token = await AsyncStorage.getItem('token');
-  if (context && context.navigation) {
-    token = await checkForToken(context.navigation);
-    if (token == '') {
-      callback(formatResult([]));
-      return;
+    const formatResult = (items = [], error = '', done = true, totalItems = null) => {
+      const nbItems = Object.keys(items).length;
+      return {
+        nbItems,
+        items,
+        error,
+        done,
+        totalItems: (totalItems ? totalItems : nbItems)
+      };
     }
-  }
-  if (token != '') {
-    userMode = true;
-  }
 
-  const baseUrl = concatParamsToURL(userMode ? getBaseUserURL(token, request) : getBaseURL(request), params);
-  let url = baseUrl;
-  if (multipage && datamode) {
-    url += '&page=1&length=' + pageLength;
-  }
+    let userMode = false;
+    if (global.token != '') {
+      userMode = true;
+    }
 
-  fetchZIP(url)
-    .then(response => response.json())
-    .then(json => {
-      let data = datamode ? json.data : json;
+    const baseUrl = concatParamsToURL(userMode ? getBaseUserURL(global.token, request) : getBaseURL(request), params);
+    let url = baseUrl;
+    if (multipage && datamode) {
+      url += '&page=1&length=' + pageLength;
+    }
 
-      // Get total number of items and compute number of pages to fetch
-      let nbItems = (multipage && datamode) ? parseInt(json[multipageTotalField]) : null;
-      let nbPages = (multipage && datamode) ? Math.ceil(nbItems / pageLength) : 1;
+    fetchZIP(url)
+      .then(response => response.json())
+      .then(json => {
+        let data = datamode ? json.data : json;
 
-      callback(formatResult(data, '', nbPages <= 1, nbItems));
+        // Get total number of items and compute number of pages to fetch
+        let nbItems = (multipage && datamode) ? parseInt(json[multipageTotalField]) : null;
+        let nbPages = (multipage && datamode) ? Math.ceil(nbItems / pageLength) : 1;
 
-      const loadPage = (page) => {
-        const url = baseUrl + '&page=' + page + '&length=' + pageLength;
-        //console.debug("Fetching page " + i + '/' + nbPages);
-        fetchZIP(url)
-          .then(response => response.json())
-          .then(json => {
-            data.push(...json.data);
-            callback(formatResult(data, '', page === nbPages ? true : false, nbItems));
-          });
-      }
-      // Perform all pages request at once. It is far far faster than
-      // making them iteratively once the previous has been fetched.
-      // Will it create an overload serverside?
-      for (let i = 2; i <= nbPages; i++) {
-        loadPage(i);
-      }
-    })
-    .catch((error) => {
-      if (retry > 0 && global.isConnected) {
-        console.debug(error);
-        if (global.verbose) {
-          showToast(true, 'Connexion perdue. Reconnexion en cours...', 'Tentative n°' + (5 - retry + 1));
+        callback(formatResult(data, '', nbPages <= 1, nbItems));
+
+        const loadPage = (page) => {
+          const url = baseUrl + '&page=' + page + '&length=' + pageLength;
+          //console.debug("Fetching page " + i + '/' + nbPages);
+          fetchZIP(url)
+            .then(response => response.json())
+            .then(json => {
+              data = json.data; //.push(...json.data);
+              callback(formatResult(data, '', page === nbPages ? true : false, nbItems));
+            });
         }
-        console.debug("Retry " + retry);
-        reloginBDovore(context ? context.navigation : null, () => {
-          fetchJSON(request, context, callback, params, datamode, multipage, multipageTotalField, pageLength, retry - 1);
-        });
-      } else {
-        console.error("Error: " + error);
-        callback(formatResult([], error.toString()));
-      }
-    });
+        // Perform all pages request at once. It is far far faster than
+        // making them iteratively once the previous has been fetched.
+        // Will it create an overload serverside?
+        for (let i = 2; i <= nbPages; i++) {
+          loadPage(i);
+        }
+      })
+      .catch((error) => {
+        if (retry > 0 && global.isConnected) {
+          console.debug(error);
+          if (global.verbose) {
+            Helpers.showToast(true, 'Connexion perdue. Reconnexion en cours...', 'Tentative n°' + (5 - retry + 1));
+          }
+          console.debug("Retry " + (5 - retry + 1) + ' / 5');
+          reloginBDovore(context ? context.navigation : null, () => {
+            fetchJSON(request, context, callback, params, datamode, multipage, multipageTotalField, pageLength, retry - 1);
+          });
+        } else {
+          console.error("Error: " + error);
+          callback(formatResult([], error.toString()));
+        }
+      });
+  });
 };
 
 export async function fetchJSONData(request, context, callback, params = {}) {
@@ -366,7 +380,7 @@ export async function fetchAlbumComments(id_tome, callback) {
 
 export async function sendAlbumComment(id_tome, callback, note = 0, comment = '') {
 
-  let token = await checkForToken();
+  let token = checkForToken();
   const url = concatParamsToURL(bdovoreBaseURL + '/albumcomment/writecomment' + '?API_TOKEN=' + encodeURI(token),
     {
       id_tome: id_tome,
@@ -422,21 +436,19 @@ export async function fetchAuteurByTerm(term, callback, params = {}) {
 
 export async function updateCollection(func, callback, params = {}) {
 
-  let token = await checkForToken();
+  let token = checkForToken();
   const url = concatParamsToURL(bdovoreBaseURL + '/macollection/' + func + '?API_TOKEN=' + encodeURI(token) + '&api_version=2', params);
 
   fetchZIP(url)
-    //.then((response) => {
-    .then(response => response.json())
-    .then(responseJson => {
-      if (responseJson.error == '') {
-        console.log(responseJson);
-        global.timestamp = responseJson.timestamp;
-        AsyncStorage.setItem('timestamp', responseJson.timestamp);
-        callback({ error: '' });
-      } else {
-        callback({ error: responseJson.error });
+    .then(resp => resp.json())
+    .then(response => {
+      if (response.error == '') {
+        //console.log(response);
+        global.serverTimestamp = response.timestamp;
+        console.log('New server timestamp: ' + response.timestamp);
+        Helpers.saveTimestamp();
       }
+      callback({ error: response.error });
     })
     .catch((error) => {
       console.debug('==> error : ' + error.toString())
