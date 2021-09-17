@@ -55,38 +55,32 @@ function SettingsPanel({ isVisible, visibleSetter }) {
 
   const onSwitchImageOnWifi = (value) => {
     setImageOnWifi(value);
-    global.imageOnWifi = value;
-    Helpers.setAsyncStorageBoolValue('imageOnWifi', value);
+    Helpers.setAndSaveGlobal('imageOnWifi', value);
   };
 
   const onSwitchAutoSync = (value) => {
     setAutoSync(value);
-    global.autoSync = value;
-    Helpers.setAsyncStorageBoolValue('autoSync', value);
+    Helpers.setAndSaveGlobal('autoSync', value);
   }
 
   const onSwitchVerbose = (value) => {
     setVerbose(value);
-    global.verbose = value;
-    Helpers.setAsyncStorageBoolValue('verbose', value);
+    Helpers.setAndSaveGlobal('verbose', value);
   };
 
   const onSwitchBDovoreIds = (value) => {
     setShowBDovoreIds(value);
-    global.showBDovoreIds = value;
-    Helpers.setAsyncStorageBoolValue('showBDovoreIds', value);
+    Helpers.setAndSaveGlobal('showBDovoreIds', value);
   }
 
   const onSwitchConfirmDeletion = (value) => {
     setConfirmDeletion(value);
-    global.confirmDeletion = value;
-    Helpers.setAsyncStorageBoolValue('confirmDeletion', value);
+    Helpers.setAndSaveGlobal('confirmDeletion', value);
   }
 
   const onSwitchConnectionMessages = (value) => {
     setShowConnectionMessages(value);
-    global.showConnectionMessages = value;
-    Helpers.setAsyncStorageBoolValue('showConnectionMessages', value);
+    Helpers.setAndSaveGlobal('showConnectionMessages', value);
   }
 
   return (
@@ -163,9 +157,7 @@ function SettingsPanel({ isVisible, visibleSetter }) {
             trackColor={{ false: CommonStyles.switchStyle.borderColor, true: CommonStyles.switchStyle.backgroundColor }} />
         </View>
 
-        <View style={{ height: 20, }}></View>
-        <Text style={[CommonStyles.defaultText, CommonStyles.linkTextStyle, CommonStyles.center]}
-          onPress={() => visibleSetter(false)}>Fermer</Text>
+        <Text style={[CommonStyles.linkTextStyle, CommonStyles.center, {marginTop: 20}]} onPress={() => visibleSetter(false)}>Fermer</Text>
       </View>
     </BottomSheet>
   );
