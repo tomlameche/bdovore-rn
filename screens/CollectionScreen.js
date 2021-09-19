@@ -152,15 +152,9 @@ function CollectionScreen({ route, navigation }) {
       // Search for keywords if provided
       if (searchKeywords != '') {
         // search text in lowercase title without taking accents
-        if (mode == 1) {
-          if (!Helpers.lowerCaseNoAccentuatedChars(item.TITRE_TOME).includes(lowerSearchText) &&
-            !Helpers.lowerCaseNoAccentuatedChars(item.NOM_SERIE).includes(lowerSearchText)) {
-            return false;
-          }
-        } else {
-          if (!Helpers.lowerCaseNoAccentuatedChars(item.NOM_SERIE).includes(lowerSearchText)) {
-            return false;
-          }
+        if ((mode == 1 ? !Helpers.lowerCaseNoAccentuatedChars(item.TITRE_TOME).includes(lowerSearchText) : true)
+          && !Helpers.lowerCaseNoAccentuatedChars(item.NOM_SERIE).includes(lowerSearchText)) {
+          return false;
         }
       }
       if (mode == 0) {
@@ -315,10 +309,10 @@ function CollectionScreen({ route, navigation }) {
           selectedIndex={collectionType}
           buttons={[{
             element: () => <Text style={CommonStyles.defaultText}>
-              {Helpers.pluralWord(filteredSeries ? filteredSeries.length : CollectionManager.numberOfSeries(collectionGenre), 'série')}</Text>
+              {Helpers.pluralWord(CollectionManager.numberOfSeries(collectionGenre), 'série')}</Text>
           }, {
             element: () => <Text style={CommonStyles.defaultText}>
-              {Helpers.pluralWord(filteredAlbums ? filteredAlbums.length : CollectionManager.numberOfAlbums(collectionGenre), 'album')}</Text>
+              {Helpers.pluralWord(CollectionManager.numberOfAlbums(collectionGenre), 'album')}</Text>
           }]}
           containerStyle={[{ marginLeft: 8, flex: 1 }, CommonStyles.buttonGroupContainerStyle]}
           buttonStyle={CommonStyles.buttonGroupButtonStyle}
