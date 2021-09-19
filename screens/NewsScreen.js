@@ -187,35 +187,31 @@ function NewsScreen({ route, navigation }) {
 
   const onPressNewsMode = (selectedIndex) => {
     setNewsMode(selectedIndex);
-    flatList.current.scrollToOffset({ offset: scrollPos[parseInt(selectedIndex)], animated: false });
+    scrollToTop(scrollPos[parseInt(selectedIndex)]);
     onSearchChanged('');
   };
 
-  const scrollToTop = () => {
-    flatList.current.scrollToOffset({ offset: 40, animated: false });
-  }
-
-  const onScrollEvent = (event) => {
-    if (event && event.nativeEvent && event.nativeEvent.contentOffset) {
-      setScrollPos(pos => { pos.splice(newsMode, 1, event.nativeEvent.contentOffset.y); return pos; });
+  const scrollToTop = (offset = 40) => {
+    if (flatList && flatList.current) {
+      flatList.current.scrollToOffset({ offset, animated: false });
     }
   }
+
+  const onScrollEvent = useCallback((event) => {
+    if (event && event.nativeEvent && event.nativeEvent.contentOffset) {
+      const curPos = event.nativeEvent.contentOffset.y;
+      setScrollPos(pos => { pos.splice(newsMode, 1, curPos); return pos; });
+    }
+  });
 
   const onSearchChanged = (searchText) => {
     setKeywords(searchText);
     searchKeywords = Helpers.lowerCaseNoAccentuatedChars(searchText);
   }
 
-  const renderAlbum = ({ item, index }) => {
-    if (!Helpers.isValid(item)) return null;
-    let show = true;
-    if (searchKeywords != '') {
-      show = Helpers.lowerCaseNoAccentuatedChars(item.TITRE_TOME).includes(searchKeywords) ||
-        Helpers.lowerCaseNoAccentuatedChars(item.NOM_SERIE).includes(searchKeywords);
-    }
-    return show ?
-      <AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} showEditionDate={true} /> : null;
-  }
+  const renderAlbum = ({ item, index }) =>
+    Helpers.isValid(item) &&
+    <AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} showEditionDate={true} />;
 
   const keyExtractor = useCallback((item, index) =>
     Helpers.isValid(item) ? Helpers.makeAlbumUID(item) : index);
@@ -237,9 +233,11 @@ function NewsScreen({ route, navigation }) {
         />
         {newsMode == 0 || newsMode == 2 ?
           <View style={{ flexDirection: 'row' }}>
-            <Text onPress={toggleAscendingSort} style={[CommonStyles.defaultText, { marginLeft: 0, marginRight: 8, marginTop: 8 }]}>
-              <Icon name={ascendingSort ? 'sort-numeric-ascending' : 'sort-numeric-descending'} size={25} />
-            </Text>
+            <TouchableOpacity onPress={toggleAscendingSort}>
+              <Text style={[CommonStyles.defaultText, { marginLeft: 0, marginRight: 8, marginTop: 8 }]}>
+                <Icon name={ascendingSort ? 'sort-numeric-ascending' : 'sort-numeric-descending'} size={25} />
+              </Text>
+            </TouchableOpacity>
           </View> : null}
       </View>
       <View style={{ flex: 1, marginHorizontal: 1 }}>
@@ -255,7 +253,7 @@ function NewsScreen({ route, navigation }) {
             maxToRenderPerBatch={6}
             windowSize={10}
             ItemSeparatorComponent={Helpers.renderSeparator}
-            data={newsMode == 0 ? filteredUserNewsAlbums : newsMode == 1 ? trendAlbums : filteredForthcomingAlbums}
+            data={Helpers.filterAlbumsWithSearchKeywords(newsMode == 0 ? filteredUserNewsAlbums : newsMode == 1 ? trendAlbums : filteredForthcomingAlbums, searchKeywords)}
             keyExtractor={keyExtractor}
             renderItem={renderAlbum}
             extraData={toggleElement}
