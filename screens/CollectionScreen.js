@@ -152,9 +152,15 @@ function CollectionScreen({ route, navigation }) {
       // Search for keywords if provided
       if (searchKeywords != '') {
         // search text in lowercase title without taking accents
-        let title = mode == 0 ? item.NOM_SERIE : item.TITRE_TOME;
-        if (title && !Helpers.lowerCaseNoAccentuatedChars(title).includes(lowerSearchText)) {
-          return false;
+        if (mode == 1) {
+          if (!Helpers.lowerCaseNoAccentuatedChars(item.TITRE_TOME).includes(lowerSearchText) &&
+            !Helpers.lowerCaseNoAccentuatedChars(item.NOM_SERIE).includes(lowerSearchText)) {
+            return false;
+          }
+        } else {
+          if (!Helpers.lowerCaseNoAccentuatedChars(item.NOM_SERIE).includes(lowerSearchText)) {
+            return false;
+          }
         }
       }
       if (mode == 0) {
