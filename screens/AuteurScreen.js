@@ -28,17 +28,15 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { SectionList, Text, TouchableOpacity, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-
-import CollectionManager from '../api/CollectionManager';
-import * as APIManager from '../api/APIManager';
-import * as Helpers from '../api/Helpers';
 
 import { AlbumItem } from '../components/AlbumItem';
 import { CollapsableSection } from '../components/CollapsableSection';
 import { CommonStyles } from '../styles/CommonStyles';
 import { CoverImage } from '../components/CoverImage';
 import { SmallLoadingIndicator } from '../components/SmallLoadingIndicator';
+import * as APIManager from '../api/APIManager';
+import * as Helpers from '../api/Helpers';
+import CollectionManager from '../api/CollectionManager';
 
 
 function AuteurScreen({ route, navigation }) {
@@ -96,7 +94,7 @@ function AuteurScreen({ route, navigation }) {
       if (key in albums) {
         albums[key].data.push(album);
       } else {
-        albums[key] = { title: album.NOM_SERIE, data: [album] };
+        albums[key] = { title: album.NOM_SERIE, id: album.ID_SERIE, data: [album] };
       }
     });
 
@@ -127,15 +125,23 @@ function AuteurScreen({ route, navigation }) {
     setNbUserAlbums(CollectionManager.getNbOfUserAlbumsByAuthor(author.ID_AUTEUR));
   }
 
-  const renderAlbum = ({ item, index }) =>
+  const renderAlbum = useCallback(({ item, index }) =>
     Helpers.isValid(item) &&
-    <AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} dontShowSerieScreen={false} refreshCallback={toggle} />;
+    <AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} dontShowSerieScreen={false} refreshCallback={toggle} />);
 
   const keyExtractor = useCallback((item, index) =>
-    Helpers.isValid(item) ? Helpers.makeAlbumUID(item) : index);
+    Helpers.isValid(item) ? Helpers.getAlbumUID(item) : index);
 
   const onPressAuthorImage = () =>
     navigation.push('Image', { source: APIManager.getAuteurCoverURL(author) });
+
+  const onPressSerie = (id) => {
+    APIManager.fetchSerie(id, (result) => {
+      if (result.error == '') {
+        navigation.push('Serie', { item: result.items[0] });
+      }
+    });
+  }
 
   const name = author.PRENOM && author.NOM ? (author.PRENOM + ' ' + author.NOM) : '';
 
@@ -170,7 +176,7 @@ function AuteurScreen({ route, navigation }) {
               null}
           </View>
           <View style={{ alignContent: 'flex-end' }}>
-            <Text style={[CommonStyles.defaultText, { textAlign: 'right', top: 5, marginRight: 7 }]}>
+            <Text style={[CommonStyles.defaultText, { textAlign: 'right', top: 5 }]}>
               {nbUserAlbums}{' / '}{nbAlbums < 0 ? '?' : nbAlbums}</Text>
           </View>
         </View>
@@ -183,13 +189,14 @@ function AuteurScreen({ route, navigation }) {
       ) : null}
       <SectionList
         style={{ flex: 1, marginHorizontal: 1 }}
-        maxToRenderPerBatch={6}
+        maxToRenderPerBatch={10}
         windowSize={10}
         sections={auteurAlbums}
         keyExtractor={keyExtractor}
         renderItem={renderAlbum}
-        renderSectionHeader={({ section: { title } }) => (
-          <Text style={[CommonStyles.sectionStyle, CommonStyles.sectionTextStyle]} numberOfLines={1} textBreakStrategy='balanced'>{title}</Text>)}
+        renderSectionHeader={({ section: { title, data } }) => (
+          <Text style={[CommonStyles.sectionStyle, CommonStyles.sectionTextStyle]} numberOfLines={1} textBreakStrategy='balanced'
+            onPress={()=>{onPressSerie(data[0].ID_SERIE)}}>{title}</Text>)}
         stickySectionHeadersEnabled={true}
         ItemSeparatorComponent={Helpers.renderSeparator}
         extraData={toggleElement}

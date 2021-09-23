@@ -47,9 +47,9 @@ function getBaseUserURL(token, dataMode) {
 
 function concatParamsToURL(url, params) {
   for (const key in params) {
-    url += '&' + key + '=' + params[key];
+    url += '&' + key + '=' + encodeURIComponent(params[key]);
   }
-  return encodeURI(url);
+  return url;
 }
 
 const GETHeaders = new Headers({
@@ -86,7 +86,7 @@ export function checkForToken(navigation = null, callback = null) {
     return callback ? callback() : 'offline-';
   }
   if (!global.token && global.login && global.passwd) {
-    console.log('undefined token -> relogin');
+    console.debug('undefined token -> relogin');
     return reloginBDovore(navigation, callback);
   }
   if (!global.token && navigation) {
@@ -100,7 +100,7 @@ export function checkForToken(navigation = null, callback = null) {
 
 export async function reloginBDovore(navigation, callback = null) {
 
-  console.log("relogin!");
+  console.debug("relogin!");
   if (global.isConnected) {
     AsyncStorage.multiGet(['login', 'passwd'])
       .then((values) => {
@@ -117,13 +117,13 @@ export async function reloginBDovore(navigation, callback = null) {
         });
       })
       .catch((error) => {
-        console.log(error);
+        console.debug(error);
         if (navigation) {
           navigation.navigate('Login');
         }
       });
   } else {
-    console.log('Not connected.');
+    console.debug('Not connected.');
   }
 }
 
@@ -148,7 +148,7 @@ export function loginBDovore(pseudo, passwd, callback) {
       'User-Agent': bdovoreUserAgent,
       'Content-Type': 'application/x-www-form-urlencoded'
     },
-    body: encodeURI('user_login=' + pseudo + '&user_password=' + passwd)
+    body: 'user_login=' + encodeURIComponent(pseudo) + '&user_password=' + encodeURIComponent(passwd)
   })
     .then(resp => resp.json())
     .then(response => {

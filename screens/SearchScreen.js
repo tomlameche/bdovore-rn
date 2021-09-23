@@ -26,14 +26,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { ButtonGroup, SearchBar } from 'react-native-elements';
 
 import { AlbumItem } from '../components/AlbumItem';
 import { AuteurItem } from '../components/AuteurItem';
-import { CommonStyles } from '../styles/CommonStyles';
+import { AlbumItemHeight, CommonStyles } from '../styles/CommonStyles';
 import { Icon } from '../components/Icon';
 import { LoadingIndicator } from '../components/LoadingIndicator';
 import { SerieItem } from '../components/SerieItem';
@@ -41,8 +41,6 @@ import * as APIManager from '../api/APIManager';
 import * as Helpers from '../api/Helpers';
 import CollectionManager from '../api/CollectionManager';
 
-
-let lastKeywords = '';
 
 function SearchScreen({ navigation }) {
 
@@ -52,6 +50,11 @@ function SearchScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [searchMode, setSearchMode] = useState(0);
   const [toggleElement, setToggleElement] = useState(Date.now());
+
+  const stateRefKeywords = useRef();
+  stateRefKeywords.current = keywords;
+  const stateRefSearchMode = useRef();
+  stateRefSearchMode.current = searchMode;
 
   const toggle = () => {
     setToggleElement(Date.now());
@@ -75,13 +78,13 @@ function SearchScreen({ navigation }) {
     onSearch(keywords);
   }, [searchMode]);
 
-  const onSearchFetched = async (searchedText, result) => {
+  const onSearchFetched = (searchedText, mode, result) => {
     // As many requests are sent to the server while typing the keywords,
     // it may happen that answers are not received in order. So we make
     // sure to only take into account the result of the request for
     // the last provided keywords.
-    if (searchedText == lastKeywords) {
-      if (!result.error && searchMode == 1) {
+    if (searchedText == stateRefKeywords.current && mode == stateRefSearchMode.current) {
+      if (!result.error && stateRefSearchMode.current == 1) {
         CollectionManager.selectOwnAlbum(result.items);
       }
       setData(result.items);
@@ -91,17 +94,19 @@ function SearchScreen({ navigation }) {
   }
 
   const onSearch = (searchText) => {
+
     if (!global.isConnected) { return; }
+
     setKeywords(searchText);
-    lastKeywords = searchText;
     if (searchText == '') {
       setData([]);
       return;
     }
 
-    const callback = (result) => onSearchFetched(searchText, result);
+    const mode = parseInt(searchMode);
+    const callback = (result) => onSearchFetched(searchText, mode, result);
     setLoading(true);
-    switch (parseInt(searchMode)) {
+    switch (mode) {
       case 0:
         APIManager.fetchSerieByTerm(searchText, callback);
         break;
@@ -160,14 +165,14 @@ function SearchScreen({ navigation }) {
     if (Helpers.isValid(item)) {
       switch (parseInt(searchMode)) {
         case 0: return parseInt(item.ID_SERIE);
-        case 1: return Helpers.makeAlbumUID(item);
+        case 1: return Helpers.getAlbumUID(item);
         case 2: return parseInt(item.ID_AUTEUR);
       }
     }
     return index;
-  });
+  }, [searchMode]);
 
-  const renderItem = ({ item, index }) => {
+  const renderItem = useCallback(({ item, index }) => {
     if (Helpers.isValid(item)) {
       switch (parseInt(searchMode)) {
         case 0: return (<SerieItem navigation={navigation} item={Helpers.toDict(item)} index={index} />);
@@ -176,16 +181,22 @@ function SearchScreen({ navigation }) {
       }
     }
     return null;
-  }
+  }, [searchMode]);
+
+  const getItemLayout = useCallback((data, index) => ({
+    length: AlbumItemHeight,
+    offset: AlbumItemHeight * index,
+    index
+  }), []);
 
   return (
     <View style={CommonStyles.screenStyle}>
       <View>
         <View style={[{ flexDirection: 'row', margin: 0, marginTop: 5 }, CommonStyles.screenStyle, { flex: 0 }]}>
-          <View style={{ width: '85%', flex: 0 }}>
+          <View style={{ flex: 1 }}>
             <SearchBar
               placeholder={parseInt(searchMode) == 0 ? 'Nom de la série...' : parseInt(searchMode) == 1 ? "Nom de l'album ou ISBN..." : "Nom de l'auteur..."}
-a              onChangeText={onSearch}
+              onChangeText={onSearch}
               onCancel={onSearchCancel}
               onClear={onSearchCancel}
               value={keywords}
@@ -202,7 +213,7 @@ a              onChangeText={onSearch}
           <TouchableOpacity
             onPress={onBarcodeSearch}
             title="Search"
-            style={{ marginLeft: 8, marginVertical: 0 }}>
+            style={{ marginLeft: 5, marginRight: 8, marginVertical: 0 }}>
             <Icon
               name='barcode-scan'
               size={36}
@@ -233,11 +244,12 @@ a              onChangeText={onSearch}
           ) : null}
           {loading ? <LoadingIndicator style={{ height: '100%' }} /> : (
             <FlatList
-              maxToRenderPerBatch={6}
+              maxToRenderPerBatch={10}
               windowSize={10}
               data={data}
               keyExtractor={keyExtractor}
               renderItem={renderItem}
+              getItemLayout={getItemLayout}
               ItemSeparatorComponent={Helpers.renderSeparator}
               extraData={toggleElement}
             />)}

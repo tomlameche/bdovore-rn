@@ -209,8 +209,10 @@ export let CommonStyles = EStyleSheet.create({
 
   markersViewStyle: {
     position: 'absolute',
-    bottom: 0,
-    right: 5,
+    bottom: -5,
+    right: 0,
+    backgroundColor: '$bg',
+    zIndex: 1,
   },
   markersSerieViewStyle: {
     /*position: 'absolute',
@@ -221,7 +223,10 @@ export let CommonStyles = EStyleSheet.create({
   markerStyle: {
     alignItems: 'center',
     alignContent: 'center',
-    padding: 8,
+    paddingLeft: 16,
+    paddingRight: 0,
+    paddingVertical: 8,
+    zIndex: 2,
   },
   markerIconStyle: {
     textAlign: 'center',
@@ -327,6 +332,15 @@ export let CommonStyles = EStyleSheet.create({
   bottomSheetSelectedItemTextStyle: {
     color: '$bg',
     alignSelf: 'center',
+  },
+  bottomSheetNotchStyle: {
+    backgroundColor: 'lightgrey',
+    borderBottomColor: 'lightgrey',
+    borderBottomWidth: 5,
+    borderRadius: 5,
+    height: 5,
+    marginVertical: 5,
+    width: '20%',
   },
 
   //***************

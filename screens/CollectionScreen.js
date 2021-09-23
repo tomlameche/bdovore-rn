@@ -80,7 +80,6 @@ let collectionGenre = 0;
 let loadingSteps = 0;
 let loadTime = 0;
 let loadedItems = 0;
-let searchKeywords = ''; // for unclear reasons, keywords state is cleared at some point during loading so we copy it here and rely on this one
 
 function CollectionScreen({ route, navigation }) {
 
@@ -99,6 +98,8 @@ function CollectionScreen({ route, navigation }) {
   const [showSortChooser, setShowSortChooser] = useState(false);
   const [sortMode, setSortMode] = useState(defaultSortMode);  // 0: Default, 1: Sort by date
   const flatList = useRef();
+  const stateRefKeywords = useRef();
+  stateRefKeywords.current = keywords;
 
   collectionGenre = route.params.collectionGenre;
 
@@ -113,7 +114,7 @@ function CollectionScreen({ route, navigation }) {
       APIManager.onConnected(navigation, () => {
         cachedToken = 'fetching';
         if (global.localTimestamp != global.serverTimestamp) {
-          console.log('refreshing from local ' + savedCachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
+          //console.log('refreshing from local ' + savedCachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
           fetchData();
         } else {
           cachedToken = global.token;
@@ -146,11 +147,11 @@ function CollectionScreen({ route, navigation }) {
 
   const filterCollection = (collection, mode) => {
 
-    const lowerSearchText = Helpers.lowerCaseNoAccentuatedChars(searchKeywords);
+    const lowerSearchText = Helpers.lowerCaseNoAccentuatedChars(stateRefKeywords.current);
 
     return collection.filter((item) => {
       // Search for keywords if provided
-      if (searchKeywords != '') {
+      if (lowerSearchText != '') {
         // search text in lowercase title without taking accents
         if ((mode == 1 ? !Helpers.lowerCaseNoAccentuatedChars(item.TITRE_TOME).includes(lowerSearchText) : true)
           && !Helpers.lowerCaseNoAccentuatedChars(item.NOM_SERIE).includes(lowerSearchText)) {
@@ -179,14 +180,14 @@ function CollectionScreen({ route, navigation }) {
   }
 
   const applyFilters = () => {
-    if (searchKeywords == '' && collectionGenre == 0 && filterMode == 0) {
+    if (stateRefKeywords.current == '' && collectionGenre == 0 && filterMode == 0) {
       setFilteredAlbums(sortMode == 1 ? Helpers.sliceSortByDate(CollectionManager.getAlbums()) : null);
     } else {
       const filteredAlbums = filterCollection(CollectionManager.getAlbums(collectionGenre), 1);
       setFilteredAlbums(sortMode == 1 ? Helpers.sliceSortByDate(filteredAlbums) : filteredAlbums);
     }
 
-    if (searchKeywords == '' && collectionGenre == 0 && serieFilterMode == 0) {
+    if (stateRefKeywords.current == '' && collectionGenre == 0 && serieFilterMode == 0) {
       setFilteredSeries(null);
     }
     else {
@@ -197,7 +198,6 @@ function CollectionScreen({ route, navigation }) {
   const fetchData = () => {
     if (!loading && global.isConnected) {
       setKeywords('');
-      searchKeywords = '';
       setSortMode(defaultSortMode);
       setLoading(true);
       setFilteredSeries(null);
@@ -216,13 +216,11 @@ function CollectionScreen({ route, navigation }) {
 
   const onFetchCollection = (result, type) => {
     setErrortext(result.error);
-    console.log(type);
 
     if (result.items) {
       loadedItems += parseFloat(result.items.length);
     }
 
-    let rate = 1;
     switch (type) {
       case 0:
         let nbTotalSeries = result.totalItems ?? result.items.length;
@@ -272,7 +270,6 @@ function CollectionScreen({ route, navigation }) {
 
   const onSearchChanged = (searchText) => {
     setKeywords(searchText);
-    searchKeywords = Helpers.lowerCaseNoAccentuatedChars(searchText);
   }
 
   const scrollToTop = (offset = 40) => {
@@ -281,7 +278,7 @@ function CollectionScreen({ route, navigation }) {
     }
   }
 
-  const renderItem = ({ item, index }) => {
+  const renderItem = useCallback(({ item, index }) => {
     if (Helpers.isValid(item)) {
       switch (collectionType) {
         case 0: return (<SerieItem navigation={navigation} item={Helpers.toDict(item)} index={index} collectionMode={true} />);
@@ -289,10 +286,17 @@ function CollectionScreen({ route, navigation }) {
       }
     }
     return null;
-  }
+  }, [collectionType]);
 
   const keyExtractor = useCallback((item, index) =>
-    Helpers.isValid(item) ? (collectionType == 0 ? parseInt(item.ID_SERIE) : Helpers.makeAlbumUID(item)) : index);
+    Helpers.isValid(item) ? (collectionType == 0 ? parseInt(item.ID_SERIE) : Helpers.makeAlbumUID(item)) : index,
+    [collectionType]);
+
+  const getItemLayout = useCallback((data, index) => ({
+    length: AlbumItemHeight,
+    offset: 40 + AlbumItemHeight * index,
+    index
+  }), []);
 
   const onScrollEvent = (event) => {
     if (event && event.nativeEvent && event.nativeEvent.contentOffset) {
@@ -320,7 +324,9 @@ function CollectionScreen({ route, navigation }) {
           innerBorderStyle={CommonStyles.buttonGroupInnerBorderStyle}
         />
         {(!global.autoSync && global.serverTimestamp != global.localTimestamp) ?
-          <TouchableOpacity onPress={() => refreshDataIfNeeded(true)}><Icon name='refresh' size={25} style={{ marginTop: 6, marginRight: 10 }} /></TouchableOpacity> : null}
+          <TouchableOpacity onPress={() => refreshDataIfNeeded(true)}>
+            <Icon name='refresh' size={25} style={{ marginTop: 6, marginRight: 10 }} />
+          </TouchableOpacity> : null}
       </View>
       {loading ?
         <Progress.Bar animated={false} progress={progressRate} width={null} color={CommonStyles.progressBarStyle.color} style={CommonStyles.progressBarStyle} /> :
@@ -343,17 +349,13 @@ function CollectionScreen({ route, navigation }) {
           {<FlatList
             ref={flatList}
             initialNumToRender={6}
-            maxToRenderPerBatch={6}
+            maxToRenderPerBatch={10}
             windowSize={10}
             data={(collectionType == 0 ? (filteredSeries ? filteredSeries : CollectionManager.getSeries()) : (filteredAlbums ? filteredAlbums : CollectionManager.getAlbums()))}
             keyExtractor={keyExtractor}
             renderItem={renderItem}
             ItemSeparatorComponent={Helpers.renderSeparator}
-            getItemLayout={(data, index) => ({
-              length: AlbumItemHeight,
-              offset: 40 + AlbumItemHeight * index,
-              index
-            })}
+            getItemLayout={getItemLayout}
             refreshControl={<RefreshControl
               colors={[bdovorlightred, bdovored]}
               tintColor={bdovored}

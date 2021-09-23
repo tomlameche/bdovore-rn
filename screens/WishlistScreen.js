@@ -37,7 +37,6 @@ import { Icon } from '../components/Icon';
 import * as Helpers from '../api/Helpers';
 import CollectionManager from '../api/CollectionManager';
 
-let searchKeywords = '';
 
 function WishlistScreen({ route, navigation }) {
 
@@ -89,15 +88,20 @@ function WishlistScreen({ route, navigation }) {
 
   const onSearchChanged = (searchText) => {
     setKeywords(searchText);
-    searchKeywords = Helpers.lowerCaseNoAccentuatedChars(searchText);
   }
 
-  const renderItem = ({ item, index }) =>
+  const renderItem = useCallback(({ item, index }) =>
     Helpers.isValid(item) &&
-    <AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} />;
+    <AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} />, []);
 
   const keyExtractor = useCallback((item, index) =>
-    Helpers.isValid(item) ? Helpers.makeAlbumUID(item) : index);
+    Helpers.isValid(item) ? Helpers.getAlbumUID(item) : index, []);
+
+  const getItemLayout = useCallback((data, index) => ({
+    length: AlbumItemHeight,
+    offset: 40 + AlbumItemHeight * index,
+    index
+  }), []);
 
   return (
     <View style={CommonStyles.screenStyle}>
@@ -140,17 +144,13 @@ function WishlistScreen({ route, navigation }) {
         <FlatList
           ref={flatList}
           style={{ flex: 1, marginHorizontal: 1 }}
-          maxToRenderPerBatch={6}
+          maxToRenderPerBatch={10}
           windowSize={10}
-          data={Helpers.filterAlbumsWithSearchKeywords(filteredData, searchKeywords)}
+          data={Helpers.filterAlbumsWithSearchKeywords(filteredData, keywords)}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
           ItemSeparatorComponent={Helpers.renderSeparator}
-          getItemLayout={(data, index) => ({
-            length: AlbumItemHeight,
-            offset: 40 + AlbumItemHeight * index,
-            index
-          })}
+          getItemLayout={getItemLayout}
           ListHeaderComponent={
             <SearchBar
               placeholder='Rechercher dans les albums...'

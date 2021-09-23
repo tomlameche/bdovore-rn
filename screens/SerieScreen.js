@@ -174,7 +174,6 @@ function SerieScreen({ route, navigation }) {
     if (serieAlbums[0] && serieAlbums[0].data.length > 0) {
       const nbAlbums = Math.max(serie.NB_TOME ?? 0, serie.NB_ALBUM);
       const nbOwnTomes = CollectionManager.getNbOfTomesInCollection(serie.ID_SERIE);
-      console.log(serie);
       Alert.alert(serie.NOM_SERIE,
         format(
           '{0} album{1} possédé{1} sur un total de {2} paru{3}.\n',
@@ -203,17 +202,17 @@ function SerieScreen({ route, navigation }) {
     }
   }
 
-  const renderAlbum = ({ item, index }) =>
+  const renderAlbum = useCallback(({ item, index }) =>
     Helpers.isValid(item) && (global.showExcludedAlbums || (!global.showExcludedAlbums && !CollectionManager.isAlbumExcluded(item))) &&
     <AlbumItem navigation={navigation}
       item={Helpers.toDict(CollectionManager.getFirstAlbumEditionOfSerieInCollection(item))}
       index={index}
       dontShowSerieScreen={true}
       showExclude={true}
-      refreshCallback={toggle} />;
+      refreshCallback={toggle} />, []);
 
   const keyExtractor = useCallback((item, index) =>
-    Helpers.isValid(item) ? Helpers.makeAlbumUID(item) : index);
+    Helpers.isValid(item) ? Helpers.getAlbumUID(item) : index, []);
 
   const getItemLayout = sectionListGetItemLayout({
     // The height of the row with rowData at the given sectionIndex and rowIndex
@@ -283,8 +282,8 @@ function SerieScreen({ route, navigation }) {
               {renderAuthors()}
               {global.showBDovoreIds ? <Text style={[CommonStyles.defaultText, CommonStyles.smallerText]}>ID-BDovore : {serie.ID_SERIE}</Text> : null}
             </View>
-            <View style={{ alignContent: 'flex-end', flex: 0 }}>
-              <Text onPress={onShowNumberOfAlbums} style={[CommonStyles.defaultText, { textAlign: 'right', top: 5, marginRight: 7 }]}>
+            <View style={{ alignContent: 'flex-end', flex: 0, marginRight: -8 }}>
+              <Text onPress={onShowNumberOfAlbums} style={[CommonStyles.defaultText, { textAlign: 'right', top: 5 }]}>
                 {nbOfUserAlbums + ' / ' + Math.max(serie.NB_TOME, serie.NB_ALBUM)}
                 {/*serie.NB_TOME > 0 ? '\n' + CollectionManager.getNbOfTomesInCollection(serie.ID_SERIE) + ' / ' + serie.NB_TOME : ''*/}</Text>
               <SerieMarkers item={serie}
@@ -315,7 +314,7 @@ function SerieScreen({ route, navigation }) {
         <SectionList
           style={{ flex: 1, marginTop: 5, marginHorizontal: 1 }}
           ref={sectionListRef}
-          maxToRenderPerBatch={6}
+          maxToRenderPerBatch={10}
           windowSize={10}
           sections={serieAlbums.filter(s => s.data.length > 0).map((section, index) => ({ ...section, index }))}
           keyExtractor={keyExtractor}

@@ -32,6 +32,7 @@ import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from 'react-na
 import { CommonStyles, bdovored } from '../styles/CommonStyles';
 import { Icon } from '../components/Icon';
 import * as APIManager from '../api/APIManager';
+import * as Helpers from '../api/Helpers';
 import CollectionManager from '../api/CollectionManager';
 
 const pBits = {
@@ -144,7 +145,7 @@ export function SerieMarkers({ item, serieAlbums, style, showExclude, refreshCal
   const isSerieExcluded = serie.IS_EXCLU == 1;
 
   return (
-    <View style={[{ flexDirection: 'row' }, style]}>
+    <View style={[{ flexDirection: 'row' }, style, { marginRight: 3 }]}>
 
       {isProcessing('addingall') ? <MarkerLoadingIndicator /> :
         (nbOfUserAlbums == 0 && serieAlbums && serieAlbums.length > 0 ?

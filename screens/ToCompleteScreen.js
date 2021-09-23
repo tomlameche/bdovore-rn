@@ -46,7 +46,6 @@ let loadedSeries = 0;
 let collectionGenre = 0;
 let albums = [];
 let series = [];
-let searchKeywords = '';
 
 function ToCompleteScreen({ route, navigation }) {
 
@@ -70,12 +69,12 @@ function ToCompleteScreen({ route, navigation }) {
       series = [];
     }
 
-    console.log('refreshing ????? local ' + cachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
+    //console.log('refreshing ????? local ' + cachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
     if ((global.autoSync || force) && cachedToken != 'fetching' && !global.forceOffline && (cachedToken != global.token || !global.collectionManquantsUpdated)) {
       const savedCachedToken = cachedToken;
       cachedToken = 'fetching';
       APIManager.onConnected(navigation, () => {
-        console.log('refreshing from local ' + savedCachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
+        //console.log('refreshing from local ' + savedCachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
         fetchData();
       }, () => { cachedToken = savedCachedToken; });
     }
@@ -183,7 +182,6 @@ function ToCompleteScreen({ route, navigation }) {
 
   const onSearchChanged = (searchText) => {
     setKeywords(searchText);
-    searchKeywords = Helpers.lowerCaseNoAccentuatedChars(searchText);
   }
 
   const scrollToTop = (offset = 40) => {
@@ -199,7 +197,7 @@ function ToCompleteScreen({ route, navigation }) {
     }
   }
 
-  const renderItem = ({ item, index }) => {
+  const renderItem = useCallback(({ item, index }) => {
     if (Helpers.isValid(item)) {
       switch (collectionType) {
         case 0: return (<SerieItem navigation={navigation} item={Helpers.toDict(item)} index={index} showExclude={true} />);
@@ -207,11 +205,17 @@ function ToCompleteScreen({ route, navigation }) {
       }
     }
     return null;
-  }
+  }, [collectionType]);
 
   const keyExtractor = useCallback((item, index) =>
     Helpers.isValid(item) ?
-      (item.IMG_COUV_SERIE ? item.ID_SERIE + 1000000 : Helpers.makeAlbumUID(item)) : index);
+      (collectionType == 0 ? item.ID_SERIE : Helpers.getAlbumUID(item)) : index, [collectionType]);
+
+  const getItemLayout = useCallback((data, index) => ({
+    length: AlbumItemHeight,
+    offset: 40 + AlbumItemHeight * index,
+    index
+  }), []);
 
   return (
     <View style={CommonStyles.screenStyle}>
@@ -235,7 +239,7 @@ function ToCompleteScreen({ route, navigation }) {
           <TouchableOpacity onPress={() => refreshDataIfNeeded(true)}><Icon name='refresh' size={25} style={{ marginTop: 6, marginRight: 10 }} /></TouchableOpacity> : null}
       </View>
       {global.isConnected ?
-        <View style={{ marginHorizontal: 1 }}>
+        <View style={{ marginLeft: 1 }}>
           {loading ? <Progress.Bar animated={false} progress={progressRate} width={null} color={CommonStyles.progressBarStyle.color} style={CommonStyles.progressBarStyle} /> : null}
           {errortext ? (
             <View style={{ alignItems: 'center', marginBottom: 5 }}>
@@ -256,19 +260,15 @@ function ToCompleteScreen({ route, navigation }) {
             <FlatList
               ref={flatList}
               initialNumToRender={6}
-              maxToRenderPerBatch={6}
+              maxToRenderPerBatch={10}
               windowSize={10}
               data={collectionType == 0 ?
-                Helpers.filterSeriesWithSearchKeywords(filteredSeries, searchKeywords) :
-                Helpers.filterAlbumsWithSearchKeywords(filteredAlbums, searchKeywords)}
+                Helpers.filterSeriesWithSearchKeywords(filteredSeries, keywords) :
+                Helpers.filterAlbumsWithSearchKeywords(filteredAlbums, keywords)}
               keyExtractor={keyExtractor}
               renderItem={renderItem}
               ItemSeparatorComponent={Helpers.renderSeparator}
-              getItemLayout={(data, index) => ({
-                length: AlbumItemHeight,
-                offset: 40 + AlbumItemHeight * index,
-                index
-              })}
+              getItemLayout={getItemLayout}
               refreshControl={<RefreshControl
                 colors={[bdovorlightred, bdovored]}
                 tintColor={bdovored}

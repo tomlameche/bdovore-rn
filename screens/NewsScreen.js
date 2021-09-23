@@ -47,7 +47,6 @@ const newsModeMap = {
 
 
 let cachedToken = '';
-let searchKeywords = '';
 
 function NewsScreen({ route, navigation }) {
 
@@ -84,7 +83,7 @@ function NewsScreen({ route, navigation }) {
     //setFilteredForthcomingAlbums(
     // Helpers.stripNewsByOrigin(forthcomingAlbums.slice(), newsModeMap[collectionGenre]));
 
-    console.log("collection genre changed");
+    //console.log("collection genre changed");
     // Fetch the tendency news for current collection genre
     fetchNewsData();
   }, [collectionGenre]);
@@ -94,12 +93,12 @@ function NewsScreen({ route, navigation }) {
   }
 
   const refreshDataIfNeeded = () => {
-    console.log('refreshing ????? local ' + cachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
+    //console.log('refreshing ????? local ' + cachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
     if (cachedToken != 'fetching' && !global.forceOffline && (cachedToken != global.token)) {
       const savedCachedToken = cachedToken;
       cachedToken = 'fetching';
       APIManager.onConnected(navigation, () => {
-        console.log('refreshing from local ' + savedCachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
+        //console.log('refreshing from local ' + savedCachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
         fetchUserNewsData();
       }, () => { cachedToken = savedCachedToken; });
     }
@@ -203,15 +202,20 @@ function NewsScreen({ route, navigation }) {
 
   const onSearchChanged = (searchText) => {
     setKeywords(searchText);
-    searchKeywords = Helpers.lowerCaseNoAccentuatedChars(searchText);
   }
 
-  const renderAlbum = ({ item, index }) =>
+  const renderAlbum = useCallback(({ item, index }) =>
     Helpers.isValid(item) &&
-    <AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} showEditionDate={true} />;
+    <AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} showEditionDate={true} showExclude={true}/>, []);
 
   const keyExtractor = useCallback((item, index) =>
-    Helpers.isValid(item) ? Helpers.makeAlbumUID(item) : index);
+    Helpers.isValid(item) ? Helpers.getAlbumUID(item) : index, []);
+
+  const getItemLayout = useCallback((data, index) => ({
+    length: AlbumItemHeight,
+    offset: 40 + AlbumItemHeight * index,
+    index
+  }), []);
 
   return (
     <View style={CommonStyles.screenStyle}>
@@ -237,7 +241,7 @@ function NewsScreen({ route, navigation }) {
             </TouchableOpacity>
           </View> : null}
       </View>
-      <View style={{ flex: 1, marginHorizontal: 1 }}>
+      <View style={{ flex: 1, marginLeft: 1 }}>
         {errortext ? (
           <Text style={CommonStyles.errorTextStyle}>
             {errortext}
@@ -247,10 +251,10 @@ function NewsScreen({ route, navigation }) {
           <FlatList
             ref={flatList}
             initialNumToRender={6}
-            maxToRenderPerBatch={6}
+            maxToRenderPerBatch={10}
             windowSize={10}
             ItemSeparatorComponent={Helpers.renderSeparator}
-            data={Helpers.filterAlbumsWithSearchKeywords(newsMode == 0 ? filteredUserNewsAlbums : newsMode == 1 ? trendAlbums : filteredForthcomingAlbums, searchKeywords)}
+            data={Helpers.filterAlbumsWithSearchKeywords(newsMode == 0 ? filteredUserNewsAlbums : newsMode == 1 ? trendAlbums : filteredForthcomingAlbums, keywords)}
             keyExtractor={keyExtractor}
             renderItem={renderAlbum}
             extraData={toggleElement}
@@ -259,11 +263,7 @@ function NewsScreen({ route, navigation }) {
               tintColor={bdovored}
               refreshing={loading}
               onRefresh={() => { fetchUserNewsData(); fetchNewsData(); }} />}
-            getItemLayout={(data, index) => ({
-              length: AlbumItemHeight,
-              offset: 40 + AlbumItemHeight * index,
-              index
-            })}
+            getItemLayout={getItemLayout}
             onScroll={onScrollEvent}
             ListHeaderComponent={
               <SearchBar
