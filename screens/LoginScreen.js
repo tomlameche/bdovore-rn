@@ -168,10 +168,6 @@ function LoginScreen({ navigation }) {
     /*if (Platform.OS != 'ios')*/ {
       global.hideSponsoredLinks = !global.hideSponsoredLinks;
       Helpers.setAndSaveGlobal('hideSponsoredLinks', global.hideSponsoredLinks);
-
-      global.uncensored = !global.uncensored;
-      Helpers.setAndSaveGlobal('uncensored', global.uncensored);
-
       Helpers.showToast(false, 'Sponsored linked are now ' + (global.hideSponsoredLinks ? 'disabled' : 'enabled') + '!');
     }
   }
