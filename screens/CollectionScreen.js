@@ -97,11 +97,16 @@ function CollectionScreen({ route, navigation }) {
   const [showSerieFilterChooser, setShowSerieFilterChooser] = useState(false);
   const [showSortChooser, setShowSortChooser] = useState(false);
   const [sortMode, setSortMode] = useState(defaultSortMode);  // 0: Default, 1: Sort by date
+  const [toggleElement, setToggleElement] = useState(Date.now());
   const flatList = useRef();
   const stateRefKeywords = useRef();
   stateRefKeywords.current = keywords;
 
   collectionGenre = route.params.collectionGenre;
+
+  const toggle = () => {
+    setToggleElement(Date.now());
+  }
 
   const refreshDataIfNeeded = (force = false) => {
     //console.log('refreshing ????? local ' + cachedToken + '/' + global.localTimestamp + ' to server ' + global.token + '/' + global.serverTimestamp);
@@ -124,10 +129,11 @@ function CollectionScreen({ route, navigation }) {
   }
 
   useEffect(() => {
-    refreshDataIfNeeded();
+    //refreshDataIfNeeded();
     // Make sure data is refreshed when login/token changed
     const willFocusSubscription = navigation.addListener('focus', () => {
       refreshDataIfNeeded();
+      toggle();
     });
     return willFocusSubscription;
   }, []);
@@ -253,7 +259,7 @@ function CollectionScreen({ route, navigation }) {
 
   const onPressCollectionType = (selectedIndex) => {
     setCollectionType(parseInt(selectedIndex));
-    flatList.current.scrollToOffset({ offset: scrollPos[parseInt(selectedIndex)], animated: false });
+    Helpers.safeScrollToOffset(flatList, { offset: scrollPos[parseInt(selectedIndex)], animated: false });
   }
 
   const onSerieFilterModePress = () => {
@@ -273,9 +279,7 @@ function CollectionScreen({ route, navigation }) {
   }
 
   const scrollToTop = (offset = 40) => {
-    if (flatList && flatList.current) {
-      flatList.current.scrollToOffset({ offset, animated: false });
-    }
+    Helpers.safeScrollToOffset(flatList, { offset, animated: false });
   }
 
   const renderItem = useCallback(({ item, index }) => {
@@ -332,11 +336,31 @@ function CollectionScreen({ route, navigation }) {
         <Progress.Bar animated={false} progress={progressRate} width={null} color={CommonStyles.progressBarStyle.color} style={CommonStyles.progressBarStyle} /> :
         null}
       {!loading && CollectionManager.isCollectionEmpty() ?
-        <View style={[CommonStyles.screenStyle, { alignItems: 'center', height: '50%', flexDirection: 'column' }]}>
+        <View style={[CommonStyles.screenStyle, { height: '50%', flexDirection: 'column' }]}>
           <View style={{ flex: 1 }}></View>
-          <Text style={CommonStyles.defaultText}>Aucun album{CollectionManager.CollectionGenres[collectionGenre][1]} dans la collection.{'\n'}</Text>
-          <Text style={CommonStyles.defaultText}>Ajoutez vos albums via les onglets Actualité, Recherche</Text>
-          <Text style={CommonStyles.defaultText}>ou le scanner de codes-barres.</Text>
+          <Text style={[CommonStyles.defaultText, CommonStyles.center]}>Aucun album{CollectionManager.CollectionGenres[collectionGenre][1]} dans la collection.{'\n'}</Text>
+          <View style={{ flexDirection: 'row', alignSelf: 'center' }}>
+            <Text style={[CommonStyles.defaultText, CommonStyles.center, {textAlign: 'center'}]}>
+              <Text style={CommonStyles.defaultText}>Ajoutez vos albums via les onglets{'\n'}</Text>
+              <Text style={CommonStyles.linkTextStyle} onPress={() => navigation.navigate('Actualité')}>Actualité</Text>
+              <Text style={CommonStyles.defaultText}>{' '}et{' '}</Text>
+              <Text style={CommonStyles.linkTextStyle} onPress={() => navigation.navigate('Rechercher')}>Rechercher</Text>
+              <Text style={CommonStyles.defaultText}>.{'\n'}</Text>
+            </Text>
+          </View>
+          <Text style={[CommonStyles.defaultText, CommonStyles.center]}>
+            Le mode ajout automatique du scanner{'\n'}
+            de codes-barres vous permet de référencer{'\n'}
+            rapidement votre collection.</Text>
+          <TouchableOpacity onPress={() =>
+            { if (global.isConnected) { navigation.push('BarcodeScanner'); }}}
+            title="Search"
+            style={{ marginLeft: 5, marginRight: 8, marginVertical: 0, alignSelf:'center' }}>
+            <Icon
+              name='barcode-scan'
+              size={42}
+              color={CommonStyles.iconStyle.color} />
+          </TouchableOpacity>
           <View style={{ flex: 1 }}></View>
         </View>
         :
@@ -354,6 +378,7 @@ function CollectionScreen({ route, navigation }) {
             data={(collectionType == 0 ? (filteredSeries ? filteredSeries : CollectionManager.getSeries()) : (filteredAlbums ? filteredAlbums : CollectionManager.getAlbums()))}
             keyExtractor={keyExtractor}
             renderItem={renderItem}
+            extraData={toggleElement}
             ItemSeparatorComponent={Helpers.renderSeparator}
             getItemLayout={getItemLayout}
             refreshControl={<RefreshControl

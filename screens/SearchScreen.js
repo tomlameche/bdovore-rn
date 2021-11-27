@@ -91,6 +91,10 @@ function SearchScreen({ navigation }) {
       setErrortext(result.error);
       setLoading(false);
     }
+
+    if (stateRefKeywords.current == '') {
+      setLoading(false);
+    }
   }
 
   const onSearch = (searchText) => {
@@ -99,6 +103,7 @@ function SearchScreen({ navigation }) {
 
     setKeywords(searchText);
     if (searchText == '') {
+      setLoading(false);
       setData([]);
       return;
     }
@@ -139,25 +144,7 @@ function SearchScreen({ navigation }) {
 
   const onBarcodeSearch = () => {
     if (global.isConnected) {
-      navigation.push('BarcodeScanner', { onGoBack: (ean) => { onSearchWithEAN(ean); } });
-    }
-  }
-
-  const onSearchWithEAN = async (ean) => {
-    if (ean) {
-      /*if (global.verbose) {
-        Helpers.showToast(false, 'Code-barre trouvé : ' + ean);
-      }*/
-      let params = (ean.length > 10) ? { EAN: ean } : { ISBN: ean };
-      APIManager.fetchAlbum((result) => {
-        if (result.error == '' && result.items.length > 0) {
-          navigation.push('Album', { item: result.items[0] })
-        } else {
-          Alert.alert(
-            "Aucun album trouvé",
-            "Aucun album trouvé avec ce code. Essayez la recherche textuelle avec le nom de la série ou de l'album.");
-        }
-      }, params);
+      navigation.push('BarcodeScanner');
     }
   }
 

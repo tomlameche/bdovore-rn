@@ -40,6 +40,7 @@ import AuteurScreen from '../screens/AuteurScreen';
 import BarcodeScanner from '../screens/BarcodeScanner';
 import CollectionPanel from '../panels/CollectionPanel';
 import CollectionScreen from '../screens/CollectionScreen';
+import CommentsScreen from '../screens/CommentsScreen';
 import ImageScreen from '../screens/ImageScreen';
 import LoginScreen from '../screens/LoginScreen';
 import NewsScreen from '../screens/NewsScreen';
@@ -75,8 +76,8 @@ const onAccountPress = (navigation) => {
 
 const ShareIcon = () => (
   Platform.OS == 'ios' ?
-    <Icon collection='Ionicons' name='ios-share-outline' size={25} color={CommonStyles.iconStyle.color} /> :
-    <Icon name='share-variant' size={25} color={CommonStyles.iconStyle.color} />);
+    <Icon name='ios-share-outline' collection='Ionicons' size={25} color={CommonStyles.iconStyle.color} /> :
+    <Icon name='share-social-outline' collection='Ionicons' size={25} color={CommonStyles.iconStyle.color} />);
 
 const shareAlbumButton = (item) => {
   return (
@@ -140,8 +141,7 @@ function CollectionScreens({ route, navigation }) {
   const onShareCollectionPress = () => {
 
     const shareCollection = () => {
-      const userid = parseInt(global.token.replace(/([0-9]+).*/, '$1')) * 1209 + 951;
-      const url = APIManager.bdovoreBaseURL + '/guest?user=' + userid;
+      const url = APIManager.bdovoreBaseURL + '/guest?user=' + Helpers.getUserid();
       Share.share({
         message: url,
         url: url
@@ -182,7 +182,7 @@ function CollectionScreens({ route, navigation }) {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onCollectionGenrePress} style={{ margin: 8 }}>
-          <Icon collection='Ionicons' name='library-sharp' size={25} color={CommonStyles.iconStyle.color} />
+          <Icon collection='Ionicons' name='library-outline' size={25} color={CommonStyles.iconStyle.color} />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onSettingsPress} style={{ margin: 8 }}>
@@ -229,6 +229,8 @@ function CollectionScreens({ route, navigation }) {
           title: Helpers.reverseAuteurName(route.params.author.PSEUDO),
           headerRight: () => shareAuthorButton(route.params.author)
         })} />
+      <CollectionStack.Screen name='BarcodeScanner' component={BarcodeScanner}
+        options={({ title: 'Scan code-barre' })} />
     </CollectionStack.Navigator>
   );
 }
@@ -242,11 +244,43 @@ function WishlistScreens({ navigation }) {
     setShowCollectionChooser(!showCollectionChooser);
   }
 
+  const onShareWishlistPress = () => {
+
+    const shareWishlist = () => {
+      const url = APIManager.bdovoreBaseURL + '/guest/wishlist?user=' + Helpers.getUserid();
+      Share.share({
+        message: url,
+        url: url
+      });
+    }
+
+    if (global.openCollection) {
+      shareWishlist();
+    } else {
+      Alert.alert('Partager ma wishlist',
+        'Le lien partagé ne fonctionnera que si vous avez autorisé la consultation de ' +
+        'votre collection par d\'autres utilisateurs sur la page profil du site internet.',
+        [{
+          text: "Oui",
+          onPress: () => shareWishlist()
+        }, {
+          text: "Annuler",
+          onPress: () => { },
+          style: "cancel"
+        }],
+        { cancelable: true });
+    }
+  }
+
+
   const settingsButton = (route, navigation) => {
     return (
       <View style={{ flexDirection: 'row' }}>
+        <TouchableOpacity onPress={onShareWishlistPress} style={{ margin: 8 }}>
+          <ShareIcon />
+        </TouchableOpacity>
         <TouchableOpacity onPress={onCollectionGenrePress} style={{ margin: 8 }}>
-          <Icon collection='Ionicons' name='library-sharp' size={25} color={CommonStyles.iconStyle.color} />
+          <Icon collection='Ionicons' name='library-outline' size={25} color={CommonStyles.iconStyle.color} />
         </TouchableOpacity>
 
         <CollectionPanel route={route}
@@ -302,7 +336,7 @@ function ToCompleteScreens({ navigation }) {
     return (
       <View style={{ flexDirection: 'row' }}>
         <TouchableOpacity onPress={onCollectionGenrePress} style={{ margin: 8 }}>
-          <Icon collection='Ionicons' name='library-sharp' size={25} color={CommonStyles.iconStyle.color} />
+          <Icon collection='Ionicons' name='library-outline' size={25} color={CommonStyles.iconStyle.color} />
         </TouchableOpacity>
 
         <CollectionPanel route={route}
@@ -348,6 +382,10 @@ function NewsScreens({ navigation }) {
   const [collectionGenre, setCollectionGenre] = useState(1);
   const [showCollectionChooser, setShowCollectionChooser] = useState(false);
 
+  const onCommentsPress = () => {
+    navigation.navigate('Comments');
+  }
+
   const onCollectionGenrePress = () => {
     setShowCollectionChooser(!showCollectionChooser);
   }
@@ -355,8 +393,12 @@ function NewsScreens({ navigation }) {
   const settingsButton = (route, navigation) => {
     return (
       <View style={{ flexDirection: 'row' }}>
+        <TouchableOpacity onPress={onCommentsPress} style={{ margin: 8 }}>
+          <Icon collection='FontAwesome' name='comments-o' size={25} color={CommonStyles.iconStyle.color} />
+        </TouchableOpacity>
+
         <TouchableOpacity onPress={onCollectionGenrePress} style={{ margin: 8 }}>
-          <Icon collection='Ionicons' name='library-sharp' size={25} color={CommonStyles.iconStyle.color} />
+          <Icon collection='Ionicons' name='library-outline' size={25} color={CommonStyles.iconStyle.color} />
         </TouchableOpacity>
 
         <CollectionPanel route={route}
@@ -379,6 +421,10 @@ function NewsScreens({ navigation }) {
             headerRight: () => settingsButton(route, navigation),
           };
         }} />
+      <NewsStack.Screen name='Comments' component={CommentsScreen}
+        options={({ route }) => ({
+          title: 'Dernières critiques',
+        })} />
       <NewsStack.Screen name='Album' component={AlbumScreen}
         options={({ route }) => ({
           title: route.params.item.TITRE_TOME,
@@ -425,15 +471,9 @@ function SearchScreens({ navigation }) {
 
 function MainTab2() {
 
-  const setTabBarMatComIcons = (icon, params) => {
+  const getIcon = (icon, params, collection = 'MaterialCommunityIcons') => {
     return (
-      <Icon name={icon} color={params.color} size={params.size} />
-    );
-  };
-
-  const setTabBarMatIcons = (icon, params) => {
-    return (
-      <Icon collection='MaterialIcons' name={icon} color={params.color} size={params.size} />
+      <Icon name={icon} color={params.color} size={params.size} collection={collection} />
     );
   };
 
@@ -449,7 +489,7 @@ function MainTab2() {
         component={CollectionScreens}
         options={{
           tabBarIcon: (p) => {
-            return setTabBarMatComIcons('home', p);
+            return getIcon('home-outline', p, 'Ionicons');
           }
         }}
       />
@@ -458,7 +498,7 @@ function MainTab2() {
         component={WishlistScreens}
         options={{
           tabBarIcon: (p) => {
-            return setTabBarMatComIcons('heart', p);
+            return getIcon('heart-outline', p, 'Ionicons');
           }
         }}
       />
@@ -467,7 +507,7 @@ function MainTab2() {
         component={ToCompleteScreens}
         options={{
           tabBarIcon: (p) => {
-            return setTabBarMatIcons('list-alt', p);
+            return getIcon('puzzle', p, 'SimpleLineIcons');
           }
         }}
       />
@@ -476,7 +516,7 @@ function MainTab2() {
         component={NewsScreens}
         options={{
           tabBarIcon: (p) => {
-            return setTabBarMatIcons('fiber-new', p);
+            return getIcon('megaphone-outline', p, 'Ionicons');//fiber-new', p);
           }
         }}
       />
@@ -485,7 +525,7 @@ function MainTab2() {
         component={SearchScreens}
         options={{
           tabBarIcon: (p) => {
-            return setTabBarMatIcons('search', p);
+            return getIcon('search', p, 'MaterialIcons');
           }
         }}
       />

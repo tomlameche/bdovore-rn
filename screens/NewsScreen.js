@@ -38,6 +38,7 @@ import * as APIManager from '../api/APIManager'
 import * as Helpers from '../api/Helpers';
 import CollectionManager from '../api/CollectionManager';
 
+
 const newsModeMap = {
   0: '',
   1: 'BD',
@@ -45,24 +46,24 @@ const newsModeMap = {
   3: 'Comics'
 };
 
-
 let cachedToken = '';
+let timeout = [null, null];
 
 function NewsScreen({ route, navigation }) {
 
   const [ascendingSort, setAscendingSort] = useState(true);
   const [collectionGenre, setCollectionGenre] = useState(1);
   const [errortext, setErrortext] = useState('');
-  const [filteredUserNewsAlbums, setFilteredUserNewsAlbums] = useState([]);
   const [filteredForthcomingAlbums, setFilteredForthcomingAlbums] = useState([]);
+  const [filteredUserNewsAlbums, setFilteredUserNewsAlbums] = useState([]);
+  const [forthcomingAlbums, setForthcomingAlbums] = useState([]);
   const [keywords, setKeywords] = useState('');
   const [loading, setLoading] = useState(false);
-  const [trendAlbums, setTrendAlbums] = useState([]);
   const [newsMode, setNewsMode] = useState(0);
   const [scrollPos, setScrollPos] = useState([40, 40, 40]);
   const [toggleElement, setToggleElement] = useState(Date.now());
+  const [trendAlbums, setTrendAlbums] = useState([]);
   const [userNewsAlbums, setUserNewsAlbums] = useState([]);
-  const [forthcomingAlbums, setForthcomingAlbums] = useState([]);
   const flatList = useRef();
 
   if (route.params.collectionGenre != collectionGenre) {
@@ -105,13 +106,17 @@ function NewsScreen({ route, navigation }) {
   }
 
   useEffect(() => {
-    refreshDataIfNeeded();
+    //refreshDataIfNeeded();
     // Make sure data is refreshed when login/token changed
     const willFocusSubscription = navigation.addListener('focus', () => {
       refreshDataIfNeeded();
       toggle();
     });
-    return willFocusSubscription;
+    return () => {
+      willFocusSubscription();
+      if (timeout[0]) clearTimeout(timeout[0]);
+      if (timeout[1]) clearTimeout(timeout[1]);
+    };
   }, []);
 
   const fetchUserNewsData = async () => {
@@ -124,7 +129,12 @@ function NewsScreen({ route, navigation }) {
       setFilteredUserNewsAlbums([]);
       setScrollPos([40, 40, 40]);
       APIManager.fetchUserNews({ navigation: navigation }, onUserNewsFetched, { nb_mois: '0' })
-        .then().catch((error) => console.debug(error));
+        .then().catch((error) => { setLoading(false); console.debug(error); });
+    } else if (!timeout[0] && userNewsAlbums.length == 0) {
+      if (verbose) {
+        Helpers.showToast(false, 'Will try to fetch user\'s news again in 2sec.');
+      }
+      timeout[0] = setTimeout(fetchUserNewsData, 2000);
     }
   }
 
@@ -137,7 +147,12 @@ function NewsScreen({ route, navigation }) {
       setForthcomingAlbums([]);
       setFilteredForthcomingAlbums([]);
       APIManager.fetchNews(newsModeMap[collectionGenre], { navigation: navigation }, onForthcomingAlbumsFetched, { mode: 2, period: '-2' })
-        .then().catch((error) => console.debug(error));
+        .then().catch((error) => { setLoading(false); console.debug(error); });
+    } else if (!timeout[1] && trendAlbums.length == 0) {
+      if (verbose) {
+        Helpers.showToast(false, 'Will try to fetch news again in 2sec.');
+      }
+      timeout[1] = setTimeout(fetchNewsData, 2000);
     }
   }
 
@@ -188,9 +203,7 @@ function NewsScreen({ route, navigation }) {
   };
 
   const scrollToTop = (offset = 40) => {
-    if (flatList && flatList.current) {
-      flatList.current.scrollToOffset({ offset, animated: false });
-    }
+    Helpers.safeScrollToOffset(flatList, { offset, animated: false });
   }
 
   const onScrollEvent = useCallback((event) => {
@@ -206,7 +219,7 @@ function NewsScreen({ route, navigation }) {
 
   const renderAlbum = useCallback(({ item, index }) =>
     Helpers.isValid(item) &&
-    <AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} showEditionDate={true} showExclude={true}/>, []);
+    <AlbumItem navigation={navigation} item={Helpers.toDict(item)} index={index} showEditionDate={true} showExclude={true} />, []);
 
   const keyExtractor = useCallback((item, index) =>
     Helpers.isValid(item) ? Helpers.getAlbumUID(item) : index, []);

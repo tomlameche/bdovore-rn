@@ -27,7 +27,10 @@
  */
 
 import { Dimensions, StyleSheet } from 'react-native';
-import EStyleSheet, { hairlineWidth } from 'react-native-extended-stylesheet';
+import EStyleSheet from 'react-native-extended-stylesheet';
+
+import SettingsManager from '../api/SettingsManager';
+
 
 export const bdovored = '#990000';
 export const bdovorlightred = '#e90101';
@@ -39,7 +42,7 @@ export let windowHeight = Dimensions.get('window').height;
 export const FullAlbumImageWidth = 180;
 export const FullAlbumImageHeight = 244;
 
-export let AlbumImageWidth = Math.min(windowWidth, windowHeight) / 4;
+export let AlbumImageWidth = Math.min(windowWidth, windowHeight) / (SettingsManager.isTablet() ? 8 : 4);
 export let AlbumImageHeight = AlbumImageWidth * (FullAlbumImageHeight / FullAlbumImageWidth);
 export let AlbumItemHeight = AlbumImageHeight + 1;
 
@@ -223,7 +226,7 @@ export let CommonStyles = EStyleSheet.create({
   markerStyle: {
     alignItems: 'center',
     alignContent: 'center',
-    paddingLeft: 16,
+    paddingLeft: 13,
     paddingRight: 0,
     paddingVertical: 8,
     zIndex: 2,
@@ -299,6 +302,14 @@ export let CommonStyles = EStyleSheet.create({
     marginTop: 10,
     textAlignVertical: 'top',
     width: '100%',
+    borderRadius: 5,
+  },
+  attributeTextInputStyle: {
+    color: 'black',
+    backgroundColor: 'lightgrey',
+    textAlignVertical: 'top',
+    width: '100%',
+    borderRadius: 5,
   },
 
   //**********************
@@ -394,6 +405,11 @@ export let CommonStyles = EStyleSheet.create({
   separatorStyle: {
     borderBottomColor: '$buttongroupcolor',
     borderBottomWidth: StyleSheet.hairlineWidth * 2,
+  },
+
+  verticalSeparatorStyle: {
+    borderRightColor: '$buttongroupcolor',
+    borderRightWidth: StyleSheet.hairlineWidth * 2,
   },
 
 });

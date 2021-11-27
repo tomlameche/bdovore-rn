@@ -27,7 +27,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { LayoutAnimation, ActivityIndicator, Alert, Text, TouchableOpacity, TouchableWithoutFeedback, UIManager, View } from 'react-native';
+import { LayoutAnimation, ActivityIndicator, Alert, Text, TouchableOpacity, UIManager, View } from 'react-native';
 
 import { CommonStyles, bdovored } from '../styles/CommonStyles';
 import * as APIManager from '../api/APIManager'
@@ -62,15 +62,19 @@ const pBits = {
   'loan': 8,
   'num': 16,
   'gift': 32,
-  'excluded': 64
+  'dedicace': 64,
+  'head': 128,
+  'excluded': 256,
 };
 
 export function AlbumMarkers({ item, style, reduceMode = true, showExclude, refreshCallback = () => { } }) {
 
   const [album, setAlbum] = useState(item);
   const [initAlbum, setInitAlbum] = useState({});
+  const [isDedicace, setIsDedicace] = useState(false);
   const [isExcluded, setIsExcluded] = useState(false);
   const [isGift, setIsGift] = useState(false);
+  const [isHeadPrint, setIsHeadPrint] = useState(false);
   const [isLoan, setIsLoan] = useState(false);
   const [isNum, setIsNum] = useState(false);
   const [isOwn, setIsOwn] = useState(false);
@@ -130,12 +134,14 @@ export function AlbumMarkers({ item, style, reduceMode = true, showExclude, refr
 
   useEffect(() => {
     //console.log('album ' + album.ID_TOME + 'refresh');
-    setIsWanted(album.FLG_ACHAT && album.FLG_ACHAT == 'O');
-    setIsRead(album.FLG_LU && album.FLG_LU == 'O');
+    setIsDedicace(album.FLG_DEDICACE && album.FLG_DEDICACE == 'O');
+    setIsExcluded(CollectionManager.isAlbumExcluded(album));
+    setIsGift(album.FLG_CADEAU && album.FLG_CADEAU == 'O');
+    setIsHeadPrint(album.FLG_TETE && album.FLG_TETE == 'O');
     setIsLoan(album.FLG_PRET && album.FLG_PRET == 'O');
     setIsNum(album.FLG_NUM && album.FLG_NUM == 'O');
-    setIsGift(album.FLG_CADEAU && album.FLG_CADEAU == 'O');
-    setIsExcluded(CollectionManager.isAlbumExcluded(album));
+    setIsRead(album.FLG_LU && album.FLG_LU == 'O');
+    setIsWanted(album.FLG_ACHAT && album.FLG_ACHAT == 'O');
   }, [album]);
 
   const onGotIt = async () => {
@@ -276,6 +282,34 @@ export function AlbumMarkers({ item, style, reduceMode = true, showExclude, refr
     });
   };
 
+  const onDedicace = async () => {
+    if (!Helpers.checkConnection()) { return; }
+
+    const dedicace = !(album.FLG_DEDICACE == 'O');
+    setProcessingBit('dedicace', true);
+    CollectionManager.setAlbumDedicaceFlag(album, dedicace, (result) => {
+      if (!result.error) {
+        setIsDedicace(dedicace);
+        refreshCallback();
+      }
+      setProcessingBit('dedicace', false);
+    });
+  };
+
+  const onHeadPrint = async () => {
+    if (!Helpers.checkConnection()) { return; }
+
+    const head = !(album.FLG_TETE == 'O');
+    setProcessingBit('head', true);
+    CollectionManager.setAlbumHeadPrintFlag(album, head, (result) => {
+      if (!result.error) {
+        setIsHeadPrint(head);
+        refreshCallback();
+      }
+      setProcessingBit('head', false);
+    });
+  };
+
   const onExcludeIt = async () => {
     if (!Helpers.checkConnection()) { return; }
 
@@ -335,13 +369,12 @@ export function AlbumMarkers({ item, style, reduceMode = true, showExclude, refr
         <Marker name='wish' iconEnabled='heart' iconDisabled='heart-outline' text='Je veux' onPressCb={onWantIt}
           isCheckedCb={() => album.FLG_ACHAT == 'O'} enabledColor={CommonStyles.markWishIconEnabled} /> : null}
 
+      {(showExclude && (!global.retractableButtons || (global.retractableButtons && (showMore || (!showMore && CollectionManager.isAlbumExcluded(album)))) && !isAlbumInCollection && !CollectionManager.isAlbumInWishlist(album))) ?
+        <Marker name='excluded' iconEnabled='cancel' iconDisabled='cancel' iconStyle={{ fontWeight: 'bold' }} text='Ignorer' onPressCb={onExcludeIt}
+          isCheckedCb={() => CollectionManager.isAlbumExcluded(album)} enabledColor={CommonStyles.markWishIconEnabled} /> : null}
+
       {(global.retractableButtons && showMore) || !reduceMode ?
         <View style={{ flexDirection: 'row' }}>
-
-          {(showExclude && !isAlbumInCollection && !CollectionManager.isAlbumInWishlist(album)) ?
-            <Marker name='excluded' iconEnabled='cancel' iconDisabled='cancel' iconStyle={{ fontWeight: 'bold' }} text='Ignorer' onPressCb={onExcludeIt}
-              isCheckedCb={() => CollectionManager.isAlbumExcluded(album)} enabledColor={CommonStyles.markWishIconEnabled} /> : null}
-
           {showAllMarks ? <View style={[{ flexDirection: 'row' }]}>
             <Marker name='read' iconEnabled='book' iconDisabled='book-outline' text='Lu' onPressCb={onReadIt}
               isCheckedCb={() => album.FLG_LU == 'O'} />
@@ -354,6 +387,12 @@ export function AlbumMarkers({ item, style, reduceMode = true, showExclude, refr
 
             <Marker name='gift' iconEnabled='gift' iconDisabled='gift-outline' text='Cadeau' onPressCb={onGift}
               isCheckedCb={() => album.FLG_CADEAU == 'O'} />
+
+            <Marker name='dedicace' iconEnabled='signature' iconDisabled='signature' text='Dédicace' onPressCb={onDedicace} iconCollection='FontAwesome5'
+              isCheckedCb={() => album.FLG_DEDICACE == 'O'} />
+
+            <Marker name='head' iconEnabled='diamond' iconDisabled='diamond' text='E.O.' onPressCb={onHeadPrint} iconCollection='FontAwesome'
+              isCheckedCb={() => album.FLG_TETE == 'O'} />
           </View> : null}
         </View> : null}
       {global.retractableButtons && reduceMode ?

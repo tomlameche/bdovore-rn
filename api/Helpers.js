@@ -33,6 +33,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { CommonStyles } from '../styles/CommonStyles';
 
+
 // Returns true if the screen is in portrait mode
 export function isPortrait() {
   const dim = Dimensions.get('screen');
@@ -86,6 +87,10 @@ export function renderSeparator() {
   return <View style={CommonStyles.separatorStyle} />
 }
 
+export function renderVerticalSeparator() {
+  return <View style={CommonStyles.verticalSeparatorStyle} />
+}
+
 export function renderAnchor() {
   return <View style={CommonStyles.bottomSheetNotchStyle} />;
 }
@@ -124,6 +129,10 @@ export function checkConnection() {
     return false;
   }
   return true;
+}
+
+export function getUserid() {
+  return parseInt(global.token.replace(/([0-9]+).*/, '$1')) * 1209 + 951;
 }
 
 export function saveTimestamp() {
@@ -376,6 +385,20 @@ export function convertDate(date) {
   return date.split('-').reverse().join('/');
 }
 
+export function getAlbumName(album) {
+  let title = album.TITRE_TOME;
+  let tome = album.NUM_TOME;
+  if (tome > 0) {
+    title = title.replace(/(.*), Tome (\d)+/, '$1');
+    title = 'T' + album.NUM_TOME + ' - ' + title;
+  }
+  return title;
+}
+
+export function getAlbumCopyright(album) {
+  return album.NOM_EDITEUR + ' / ' + reverseAuteurName(album.depseudo);
+}
+
 export function getDateParutionAlbum(album) {
   let date = '';
   if (album.DTE_PARUTION) { date = convertDate(album.DTE_PARUTION); }
@@ -404,4 +427,10 @@ export function showToast(isError, text1, text2 = '', duration = 1000) {
     text1,
     text2,
   });
+}
+
+export function safeScrollToOffset(flatList, options) {
+  if (flatList && flatList.current && flatList.current.scrollToOffset) {
+    flatList.current.scrollToOffset(options);
+  }
 }

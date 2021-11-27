@@ -129,7 +129,7 @@ function createEntry(schema, item) {
         } else if (keytype.startsWith('float')) {
           album[key] = parseFloat(value);
         } else if (keytype.startsWith('string')) {
-          album[key] = value;
+          album[key] = value != 'null' ? value : null;
         } else {
           //console.debug('Unknown type (' + keytype + ') for key ' + key);
         }
@@ -203,6 +203,8 @@ class CCollectionManager {
     global.db.write(() => {
       global.db.deleteAll();
     });
+
+    Helpers.setAndSaveGlobal('collectionFetched', false);
   }
 
   saveTimestamp() {
@@ -408,14 +410,14 @@ class CCollectionManager {
   }
 
   getAlbumType(album) {
-    if (album.FLG_TYPE_TOME == 1 || album.TITRE_TOME.startsWith('Pack ')) {
+    if (album.FLG_TYPE_TOME == 1 || (album.TITRE_TOME && album.TITRE_TOME.startsWith('Pack '))) {
       return 2; // Coffret
     }
     if (album.FLG_INT_TOME == 'O') {
       return 1; // Intégrale
     }
-    if (album.TITRE_TOME.endsWith('TL') || album.TITRE_TOME.endsWith('TT')
-      || album.TITRE_TOME.includes('(TL)') || album.TITRE_TOME.includes('(TT)')) {
+    if (album.TITRE_TOME.endsWith('TL') || (album.TITRE_TOME && album.TITRE_TOME.endsWith('TT'))
+      || album.TITRE_TOME.includes('(TL)') || (album.TITRE_TOME && album.TITRE_TOME.includes('(TT)'))) {
       return 3; // Edition spéciale
     }
     return 0; // Album
@@ -698,17 +700,29 @@ class CCollectionManager {
     }
     try {
       global.db.write(() => {
+        album.comment = '';
+        album.cote = '';
+        album.EMAIL_PRET = '';
         album.FLG_ACHAT = 'N';
-        album.FLG_LU = 'N';
-        album.FLG_PRET = 'N';
-        album.FLG_NUM = 'N';
         album.FLG_CADEAU = 'N';
+        album.FLG_DEDICACE = 'N';
+        album.FLG_LU = 'N';
+        album.FLG_NUM = 'N';
+        album.FLG_PRET = 'N';
+        album.FLG_TETE = 'N';
+        album.NOM_PRET = '';
 
+        colAlb.comment = '';
+        colAlb.cote = '';
+        colAlb.EMAIL_PRET = '';
         colAlb.FLG_ACHAT = 'N';
-        colAlb.FLG_LU = 'N';
-        colAlb.FLG_PRET = 'N';
-        colAlb.FLG_NUM = 'N';
         colAlb.FLG_CADEAU = 'N';
+        colAlb.FLG_DEDICACE = 'N';
+        colAlb.FLG_LU = 'N';
+        colAlb.FLG_NUM = 'N';
+        colAlb.FLG_PRET = 'N';
+        colAlb.FLG_TETE = 'N';
+        colAlb.NOM_PRET = '';
       });
     } catch (error) {
       result.error = "Erreur inattendue lors de la mise à jour de l'album";
@@ -747,7 +761,25 @@ class CCollectionManager {
   }
 
   setAlbumLendFlag(album, flag, callback = null) {
-    this.setAlbumFlag(album, 'FLG_PRET', flag, callback);
+    this.setAlbumFlag(album, 'FLG_PRET', flag, (result) => {
+      if (!result.error && flag == false) {
+        // Album is no more lend, clear the borrower name and email
+        try {
+          const colAlb = this.getAlbumInCollection(album) ?? album;
+          global.db.write(() => {
+            album.NOM_PRET = '';
+            album.EMAIL_PRET = '';
+            colAlb.NOM_PRET = '';
+            colAlb.EMAIL_PRET = '';
+          });
+        } catch (error) {
+          console.debug(error);
+        }
+      }
+      if (callback) {
+        callback(result);
+      }
+    });
   }
 
   setAlbumNumEdFlag(album, flag, callback = null) {
@@ -757,6 +789,54 @@ class CCollectionManager {
   setAlbumGiftFlag(album, flag, callback = null) {
     this.setAlbumFlag(album, 'FLG_CADEAU', flag, callback);
   };
+
+  setAlbumDedicaceFlag(album, flag, callback = null) {
+    this.setAlbumFlag(album, 'FLG_DEDICACE', flag, callback);
+  };
+
+  setAlbumHeadPrintFlag(album, flag, callback = null) {
+    this.setAlbumFlag(album, 'FLG_TETE', flag, callback);
+  };
+
+  setAlbumAttribute(album, attribute, value, callback = null) {
+    const colAlb = this.getAlbumInCollection(album) ?? album;
+    if (!colAlb) {
+      console.debug('Error: unable to find album ' + album.ID_TOME + ' of serie ' + album.ID_SERIE + ' in collection!');
+      return;
+    }
+    try {
+      const prevValue = colAlb.value;
+      global.db.write(() => {
+        album[attribute] = value;
+        colAlb[attribute] = value;
+      });
+      this.updateAlbumEdition(album, (result) => {
+        if (result.error) {
+          global.db.write(() => {
+            album[attribute] = prevValue;
+            colAlb[attribute] = prevValue;
+          });
+        }
+        if (callback) {
+          callback(result);
+        }
+      });
+    } catch (error) {
+      result.error = "Erreur inattendue lors de la mise à jour de l'album";
+    }
+  };
+
+  setAlbumComment(album, comment, callback = null) {
+    this.setAlbumAttribute(album, 'comment', comment, callback);
+  };
+
+  setAlbumBorrower(album, borrower, callback = null) {
+    this.setAlbumAttribute(album, 'NOM_PRET', borrower, callback);
+  }
+
+  setAlbumBorrowerEmail(album, email, callback = null) {
+    this.setAlbumAttribute(album, 'EMAIL_PRET', email, callback);
+  }
 
   updateAlbumEdition(album, callback = null) {
     APIManager.updateAlbumInCollection(album.ID_TOME, (result) => {
@@ -772,10 +852,16 @@ class CCollectionManager {
     }, {
       'id_edition': album.ID_EDITION,
       'flg_achat': 'N',
-      'flg_lu': album.FLG_LU ? album.FLG_LU : 'N',
       'flg_cadeau': album.FLG_CADEAU ? album.FLG_CADEAU : 'N',
-      'flg_pret': album.FLG_PRET ? album.FLG_PRET : 'N',
+      'flg_dedicace': album.FLG_DEDICACE ? album.FLG_DEDICACE : 'N',
+      'flg_lu': album.FLG_LU ? album.FLG_LU : 'N',
       'flg_num': album.FLG_NUM ? album.FLG_NUM : 'N',
+      'flg_pret': album.FLG_PRET ? album.FLG_PRET : 'N',
+      'flg_tete': album.FLG_TETE ? album.FLG_TETE : 'N',
+      'comment': album.comment,
+      'cote': album.cote,
+      'NOM_PRET': album.NOM_PRET,
+      'EMAIL_PRET': album.EMAIL_PRET,
     });
   }
 
@@ -793,7 +879,11 @@ class CCollectionManager {
   }
 
   getAlbumInCollection(album) {
-    return global.db.objectForPrimaryKey('Albums', Helpers.getAlbumUID(album)) ?? null;
+    if (album.ID_EDITION) {
+      return global.db.objectForPrimaryKey('Albums', Helpers.getAlbumUID(album)) ?? null;
+    }
+    let ret = this.getAlbums().filtered('ID_SERIE == $0 && ID_TOME == $1', parseInt(album.ID_SERIE), parseInt(album.ID_TOME));
+    return (ret.length > 0) ? ret[0] : null;
   }
 
   getAlbumInWishlist(album) {
